@@ -175,7 +175,7 @@ interface Obstacle {
 }
 
 const LANES = [-3.2, 0, 3.2]
-const GAME_DURATION_SECONDS = 300 // 5 full minutes!
+const DEFAULT_DURATION_SECONDS = 45 // 30s to 60s hackathon duration
 
 // --- 3D SCENE GRAPHICS COMPONENTS ---
 
@@ -651,6 +651,7 @@ export default function SpaceRunnerGame({
   // Pre-game configuration states
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('medium')
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetOption>(PLANETS[0])
+  const [selectedDuration, setSelectedDuration] = useState<number>(DEFAULT_DURATION_SECONDS)
 
   // Game loop phases: starts at 'briefing' prompt!
   const [phase, setPhase] = useState<GamePhase>('briefing')
@@ -660,8 +661,8 @@ export default function SpaceRunnerGame({
   // Gameplay states
   const [targetLane, setTargetLane] = useState(0) // -1, 0, 1
   const [lives, setLives] = useState(3)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0) // 0 to 300 seconds (5 mins)
-  const [checkpointTime, setCheckpointTime] = useState(0) // 0s, 100s, 200s
+  const [elapsedSeconds, setElapsedSeconds] = useState(0) // 0 to selectedDuration (30s to 60s)
+  const [checkpointTime, setCheckpointTime] = useState(0) // Checkpoint in seconds
   const [score, setScore] = useState(0)
   const [aliensDestroyed, setAliensDestroyed] = useState(0)
   const [asteroidsDestroyed, setAsteroidsDestroyed] = useState(0)
@@ -682,8 +683,8 @@ export default function SpaceRunnerGame({
   const invulnerableUntil = useRef(0)
 
   const diffConfig = DIFFICULTIES[selectedDifficulty]
-  const progressPercent = Math.min(100, (elapsedSeconds / GAME_DURATION_SECONDS) * 100)
-  const remainingSeconds = Math.max(0, GAME_DURATION_SECONDS - elapsedSeconds)
+  const progressPercent = Math.min(100, (elapsedSeconds / selectedDuration) * 100)
+  const remainingSeconds = Math.max(0, selectedDuration - elapsedSeconds)
 
   // Start launch countdown from briefing screen
   const startLaunchSequence = () => {
@@ -788,32 +789,35 @@ export default function SpaceRunnerGame({
     if (phase !== 'playing') return
 
     const tickMs = 35
+    const cp1 = Math.round(selectedDuration * 0.33)
+    const cp2 = Math.round(selectedDuration * 0.66)
+
     const loop = setInterval(() => {
-      // Advance flight time towards 5 minutes (300 seconds)
+      // Advance flight time towards selected duration (30s to 60s)
       setElapsedSeconds((sec) => {
         const nextSec = sec + tickMs / 1000
 
-        // Checkpoint 1 (Alpha) at 33% (100 seconds / 01:40)
-        if (sec < 100 && nextSec >= 100) {
-          setCheckpointTime(100)
-          setCheckpointNotification('CHECKPOINT ALPHA REACHED (33% • 01:40)')
+        // Checkpoint 1 (Alpha) at 33%
+        if (sec < cp1 && nextSec >= cp1) {
+          setCheckpointTime(cp1)
+          setCheckpointNotification(`CHECKPOINT ALPHA REACHED (33% • ${formatTime(cp1)})`)
           audioTelemetry.playCheckpoint()
-          setTimeout(() => setCheckpointNotification(null), 3000)
+          setTimeout(() => setCheckpointNotification(null), 2500)
         }
 
-        // Checkpoint 2 (Bravo) at 66% (200 seconds / 03:20)
-        if (sec < 200 && nextSec >= 200) {
-          setCheckpointTime(200)
-          setCheckpointNotification('CHECKPOINT BRAVO REACHED (66% • 03:20)')
+        // Checkpoint 2 (Bravo) at 66%
+        if (sec < cp2 && nextSec >= cp2) {
+          setCheckpointTime(cp2)
+          setCheckpointNotification(`CHECKPOINT BRAVO REACHED (66% • ${formatTime(cp2)})`)
           audioTelemetry.playCheckpoint()
-          setTimeout(() => setCheckpointNotification(null), 3000)
+          setTimeout(() => setCheckpointNotification(null), 2500)
         }
 
-        // 100% Planetary Orbit Arrival (300 seconds / 05:00)
-        if (nextSec >= GAME_DURATION_SECONDS) {
+        // 100% Planetary Orbit Arrival
+        if (nextSec >= selectedDuration) {
           setPhase('victory')
           audioTelemetry.playMissionSuccess()
-          return GAME_DURATION_SECONDS
+          return selectedDuration
         }
         return nextSec
       })
@@ -964,7 +968,7 @@ export default function SpaceRunnerGame({
                 setElapsedSeconds(checkpointTime)
                 invulnerableUntil.current = Date.now() + 3000 // 3 seconds shield
                 setCheckpointNotification(
-                  `RESPAWNING AT CHECKPOINT (${Math.round((checkpointTime / GAME_DURATION_SECONDS) * 100)}% • SHIELD ACTIVE)`,
+                  `RESPAWNING AT CHECKPOINT (${Math.round((checkpointTime / selectedDuration) * 100)}% • SHIELD ACTIVE)`,
                 )
                 setTimeout(() => setCheckpointNotification(null), 2800)
                 return remaining
@@ -984,7 +988,7 @@ export default function SpaceRunnerGame({
     }, tickMs)
 
     return () => clearInterval(loop)
-  }, [phase, targetLane, checkpointTime, diffConfig])
+  }, [phase, targetLane, checkpointTime, diffConfig, selectedDuration])
 
   // Restart from beginning after gameover
   const restartFromBeginning = () => {
@@ -1010,9 +1014,9 @@ export default function SpaceRunnerGame({
         <div className="pointer-events-none absolute inset-0 z-50 bg-red-600/35 transition-opacity" />
       )}
 
-      {/* 3D Canvas */}
+      {/* 3D Canvas with Elevated Camera for Clear Vanishing Horizon */}
       <Canvas
-        camera={{ position: [0, 2.3, 5.6], fov: 60 }}
+        camera={{ position: [0, 2.8, 5.8], fov: 62 }}
         className="absolute inset-0 z-0"
       >
         <ambientLight intensity={0.5} color="#0c1d36" />
@@ -1080,7 +1084,7 @@ export default function SpaceRunnerGame({
                     NASA Mission Window • Flight Briefing
                   </span>
                   <span className="text-[11px] font-mono text-[#86868b] flex items-center gap-1">
-                    <Clock size={12} /> 5:00 MIN FLIGHT
+                    <Clock size={12} /> {selectedDuration}s FLIGHT
                   </span>
                 </div>
                 <h2 className="mt-1.5 text-2xl md:text-3xl font-bold tracking-tight text-white apple-headline">
@@ -1197,7 +1201,52 @@ export default function SpaceRunnerGame({
               </div>
             </div>
 
-            {/* Section 3: Mission Rules & Features Banner */}
+            {/* Section 3: Choose Mission Duration (30s to 60s) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold tracking-wider text-white uppercase flex items-center gap-1.5">
+                  <Clock size={14} className="text-[#ff9f0a]" /> 3. Select Mission Duration (30s – 60s)
+                </p>
+                <span className="text-[11px] text-[#ff9f0a] font-mono">
+                  {selectedDuration}s Flight Window
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { sec: 30, title: '30 Seconds', tag: 'Fast Sprint', desc: 'Hyper-paced evaluation run' },
+                  { sec: 45, title: '45 Seconds', tag: 'Recommended', desc: 'Optimal hackathon pacing' },
+                  { sec: 60, title: '60 Seconds', tag: 'Full Flight', desc: 'Complete 1-minute voyage' },
+                ].map((dOpt) => {
+                  const isSel = selectedDuration === dOpt.sec
+                  return (
+                    <button
+                      key={dOpt.sec}
+                      type="button"
+                      onClick={() => {
+                        audioTelemetry.playClick()
+                        setSelectedDuration(dOpt.sec)
+                      }}
+                      className={`rounded-2xl p-3.5 text-left transition-all duration-200 border ${
+                        isSel
+                          ? 'border-[#ff9f0a] bg-[#ff9f0a]/15 shadow-[0_0_20px_rgba(255,159,10,0.25)]'
+                          : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/[0.18]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-sm text-white">{dOpt.title}</span>
+                        <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-full bg-white/10 text-[#ff9f0a]">
+                          {dOpt.tag}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[#86868b] leading-tight">{dOpt.desc}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Section 4: Mission Rules & Features Banner */}
             <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs text-[#86868b]">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-white font-medium">
@@ -1205,7 +1254,7 @@ export default function SpaceRunnerGame({
                   <span>Mission Rules & Features:</span>
                 </div>
                 <p>
-                  • <strong>Duration</strong>: Exactly <strong>5:00 Minutes</strong> (Checkpoints at <strong>33%</strong> and <strong>66%</strong>).
+                  • <strong>Duration</strong>: <strong>{selectedDuration} Seconds</strong> (Checkpoints at <strong>33%</strong> and <strong>66%</strong>).
                 </p>
                 <p>
                   • <strong>Meteor Slingshot</strong>: Blasting an asteroid shoots a kinetic meteorite into alien ships for <strong>+750 PTS</strong>!
@@ -1218,7 +1267,7 @@ export default function SpaceRunnerGame({
               <div className="text-right shrink-0 font-mono text-[11px] text-[#2997ff]">
                 Target: {selectedPlanet.name.toUpperCase()}
                 <br />
-                Vector: LIGHT SPEED (1.0c)
+                Duration: {selectedDuration}s @ 1.0c
               </div>
             </div>
 
@@ -1230,7 +1279,7 @@ export default function SpaceRunnerGame({
                 className="apple-pill-btn flex-1 bg-gradient-to-r from-[#0071e3] to-[#af52de] hover:opacity-95 text-white py-3.5 text-sm font-semibold shadow-[0_4px_24px_rgba(0,113,227,0.5)] flex items-center justify-center gap-2 transition hover:scale-[1.01]"
               >
                 <Rocket size={17} />
-                <span>Ignite Engines & Launch to {selectedPlanet.name}</span>
+                <span>Ignite Engines & Launch ({selectedDuration}s Flight)</span>
               </button>
               <button
                 type="button"
@@ -1256,7 +1305,7 @@ export default function SpaceRunnerGame({
                 MISSION LAUNCH
               </h2>
               <p className="mt-2 text-xs text-[#86868b] leading-relaxed">
-                T-minus ignition. Deploying into 5-minute light-speed trajectory toward <strong>{selectedPlanet.name}</strong> ({diffConfig.name} difficulty).
+                T-minus ignition. Deploying into {selectedDuration}-second light-speed trajectory toward <strong>{selectedPlanet.name}</strong> ({diffConfig.name} difficulty).
               </p>
             </div>
 
@@ -1275,74 +1324,75 @@ export default function SpaceRunnerGame({
         </div>
       )}
 
-      {/* --- PHASE 2: PLAYING OVERLAY (PROGRESS & ON-SCREEN CONTROLS) --- */}
+      {/* --- PHASE 2: PLAYING OVERLAY (CLEAR HORIZON HUD) --- */}
       {phase === 'playing' && (
         <>
-          {/* Distance & Planet Progress Bar (Top Center) */}
-          <div className="absolute top-20 inset-x-0 z-20 flex justify-center px-4">
-            <div className="w-full max-w-2xl rounded-2xl border border-white/[0.1] bg-[#161617]/85 p-3.5 backdrop-blur-2xl shadow-2xl">
-              <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
-                <span className="text-[#86868b] flex items-center gap-1.5">
-                  <Rocket size={13} className="text-[#2997ff]" /> Earth
-                </span>
-                <span className="font-mono text-[#2997ff] font-semibold flex items-center gap-2">
-                  <Clock size={13} className="text-[#ff9f0a]" />
-                  <span>{formatTime(remainingSeconds)} REMAINING</span>
-                  <span>•</span>
-                  <span>{Math.round(progressPercent)}%</span>
-                </span>
-                <span className="text-[#ff9f0a] flex items-center gap-1.5 font-semibold">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full inline-block"
-                    style={{ backgroundColor: selectedPlanet.color }}
-                  />
-                  {selectedPlanet.name}
-                </span>
-              </div>
+          {/* Top-Edge 2.5px Flight Vector Progress Bar */}
+          <div className="absolute top-0 inset-x-0 z-30 h-[2.5px] bg-white/[0.08]">
+            <div
+              className="h-full bg-gradient-to-r from-[#0071e3] via-[#2997ff] to-[#34c759] transition-all duration-100 ease-out"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
 
-              {/* Progress bar with Checkpoint notches */}
-              <div className="relative h-2 rounded-full bg-white/[0.08] overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-[#0071e3] via-[#2997ff] to-[#34c759] transition-all duration-100 ease-out"
-                  style={{ width: `${progressPercent}%` }}
-                />
-                {/* 33% Notch */}
-                <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-white/40"
-                  style={{ left: '33.33%' }}
-                  title="Checkpoint Alpha (01:40)"
-                />
-                {/* 66% Notch */}
-                <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-white/40"
-                  style={{ left: '66.66%' }}
-                  title="Checkpoint Bravo (03:20)"
-                />
-              </div>
+          {/* Vertical Flight Telemetry Rail (Pinned to Right Edge - 100% Clear Center) */}
+          <div className="hidden sm:flex absolute right-4 top-20 bottom-32 z-20 flex-col items-center pointer-events-none select-none">
+            {/* Target Planet Marker */}
+            <div
+              className="h-7 w-7 rounded-full shadow-lg flex items-center justify-center text-[11px] border border-white/20 mb-1"
+              style={{ backgroundColor: selectedPlanet.color }}
+              title={selectedPlanet.name}
+            >
+              🪐
+            </div>
+            <span className="text-[9px] font-mono text-[#86868b] uppercase font-bold tracking-tight mb-1">
+              {selectedPlanet.name}
+            </span>
 
-              <div className="flex justify-between text-[10px] text-[#86868b] mt-1 font-mono">
-                <span>00:00 (Launch)</span>
-                <span>01:40 (CP Alpha 33%)</span>
-                <span>03:20 (CP Bravo 66%)</span>
-                <span>05:00 ({selectedPlanet.name} Orbit)</span>
-              </div>
+            {/* Vertical Flight Rail */}
+            <div className="relative w-1 flex-1 rounded-full bg-white/[0.1] overflow-hidden my-1">
+              {/* Ascending Rocket Progress Line */}
+              <div
+                className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#0071e3] via-[#2997ff] to-[#34c759] rounded-full transition-all duration-150"
+                style={{ height: `${progressPercent}%` }}
+              />
+              {/* 33% Notch Alpha */}
+              <div
+                className="absolute inset-x-0 h-0.5 bg-white/50"
+                style={{ bottom: '33.33%' }}
+                title="Checkpoint Alpha (33%)"
+              />
+              {/* 66% Notch Bravo */}
+              <div
+                className="absolute inset-x-0 h-0.5 bg-white/50"
+                style={{ bottom: '66.66%' }}
+                title="Checkpoint Bravo (66%)"
+              />
+            </div>
+
+            {/* Earth Launch Base */}
+            <span className="text-[9px] font-mono text-[#86868b] uppercase font-bold tracking-tight mt-1">
+              Earth
+            </span>
+            <div className="h-4 w-4 rounded-full bg-[#0071e3] border border-white/30 text-[9px] flex items-center justify-center font-bold">
+              🌍
             </div>
           </div>
 
-          {/* Checkpoint & Combo Banners */}
+          {/* Floating Side Notifications (Moved to Upper Right to never block center vision) */}
           {checkpointNotification && (
-            <div className="absolute top-36 inset-x-0 z-30 flex justify-center animate-bounce">
-              <div className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-5 py-2 backdrop-blur-xl text-xs font-semibold text-[#34c759] shadow-xl flex items-center gap-2">
-                <CheckCircle size={15} />
+            <div className="absolute top-20 right-14 z-30 animate-bounce">
+              <div className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-4 py-1.5 backdrop-blur-xl text-xs font-semibold text-[#34c759] shadow-xl flex items-center gap-2">
+                <CheckCircle size={14} />
                 {checkpointNotification}
               </div>
             </div>
           )}
 
           {comboBanner && (
-            <div className="absolute top-48 inset-x-0 z-30 flex justify-center animate-pulse">
-              <div className="rounded-full border border-amber-400/50 bg-amber-500/25 px-5 py-1.5 backdrop-blur-xl text-xs font-bold text-[#ff9f0a] shadow-xl flex items-center gap-2">
-                <Flame size={15} />
+            <div className="absolute top-28 right-14 z-30 animate-pulse">
+              <div className="rounded-full border border-amber-400/50 bg-amber-500/25 px-4 py-1.5 backdrop-blur-xl text-xs font-bold text-[#ff9f0a] shadow-xl flex items-center gap-2">
+                <Flame size={14} />
                 {comboBanner}
               </div>
             </div>
@@ -1383,38 +1433,80 @@ export default function SpaceRunnerGame({
         </>
       )}
 
-      {/* --- HUD HEADER BAR --- */}
-      <header className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-5 md:px-8 bg-gradient-to-b from-black/80 to-transparent backdrop-blur-md">
-        <div className="flex items-center gap-4">
+      {/* --- HUD HEADER BAR (INTEGRATED COMPACT TIMELINE - ZERO CENTER OBSTRUCTION) --- */}
+      <header className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-4 md:px-7 bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-xs">
+        {/* Left: Exit & Destination Badge */}
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onExit}
-            className="apple-pill-btn flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.08] hover:bg-white/[0.16] px-4 py-2 text-xs font-medium text-white transition"
+            className="apple-pill-btn flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.08] hover:bg-white/[0.16] px-3.5 py-1.5 text-xs font-medium text-white transition"
           >
-            <ArrowLeft size={14} /> Back to Operations
+            <ArrowLeft size={13} /> Exit
           </button>
 
-          <div>
-            <h1 className="font-semibold text-sm md:text-base tracking-tight apple-headline flex items-center gap-2">
-              <Rocket size={16} className="text-[#2997ff]" />
-              DEEP SPACE ODYSSEY • {selectedPlanet.name.toUpperCase()}
-            </h1>
-            <p className="text-[10px] tracking-[0.2em] text-[#86868b] uppercase">
-              {diffConfig.name} Difficulty • 5-Minute Planetary Intercept
-            </p>
+          <div className="flex items-center gap-2">
+            <span
+              className="h-2.5 w-2.5 rounded-full shadow-sm"
+              style={{ backgroundColor: selectedPlanet.color }}
+            />
+            <span className="font-semibold text-xs text-white tracking-tight">
+              {selectedPlanet.name.toUpperCase()}
+            </span>
+            <span className="text-[10px] font-mono text-[#86868b] uppercase border border-white/10 rounded-full px-2 py-0.5">
+              {diffConfig.name}
+            </span>
           </div>
         </div>
 
-        {/* Lives Counter & Score */}
+        {/* Center: Slim Integrated Flight Capsule (Takes 0 vertical space below the bar!) */}
         {phase === 'playing' && (
-          <div className="flex items-center gap-4">
+          <div className="hidden sm:flex items-center gap-3 rounded-full border border-white/[0.12] bg-[#161617]/75 px-4 py-1.5 backdrop-blur-xl shadow-lg">
+            <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-[#2997ff]">
+              <Clock size={13} className="text-[#ff9f0a]" />
+              <span>{formatTime(remainingSeconds)}</span>
+            </div>
+            <span className="text-white/20">|</span>
+            <div className="w-24 h-1.5 rounded-full bg-white/10 overflow-hidden relative">
+              <div
+                className="h-full bg-gradient-to-r from-[#0071e3] to-[#34c759]"
+                style={{ width: `${progressPercent}%` }}
+              />
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-white/50"
+                style={{ left: '33.33%' }}
+                title="Checkpoint Alpha"
+              />
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-white/50"
+                style={{ left: '66.66%' }}
+                title="Checkpoint Bravo"
+              />
+            </div>
+            <span className="text-white/20">|</span>
+            <span className="font-mono text-xs font-bold text-white/90">
+              {Math.round(progressPercent)}%
+            </span>
+            <span className="text-white/20">|</span>
+            <span className="text-[10px] font-mono text-[#86868b] uppercase">
+              {progressPercent < 33
+                ? 'Vector Alpha'
+                : progressPercent < 66
+                  ? 'Vector Bravo'
+                  : `${selectedPlanet.name} Orbit`}
+            </span>
+          </div>
+        )}
+
+        {/* Right: Lives Counter & Score */}
+        {phase === 'playing' ? (
+          <div className="flex items-center gap-3">
             {/* Lives Indicator */}
-            <div className="flex items-center gap-1.5 rounded-full border border-white/[0.1] bg-[#161617]/80 px-4 py-1.5 backdrop-blur-xl">
-              <span className="text-[10px] text-[#86868b] uppercase tracking-wider mr-1">Lives:</span>
+            <div className="flex items-center gap-1 rounded-full border border-white/[0.1] bg-[#161617]/80 px-3 py-1 backdrop-blur-xl">
               {[1, 2, 3].map((heartIndex) => (
                 <Heart
                   key={heartIndex}
-                  size={16}
+                  size={14}
                   className={
                     heartIndex <= lives
                       ? 'fill-red-500 text-red-500 animate-pulse'
@@ -1425,10 +1517,12 @@ export default function SpaceRunnerGame({
             </div>
 
             {/* Combat Score */}
-            <div className="rounded-full border border-white/[0.1] bg-[#161617]/80 px-4 py-1.5 backdrop-blur-xl font-mono text-xs font-semibold text-[#2997ff]">
+            <div className="rounded-full border border-white/[0.1] bg-[#161617]/80 px-3.5 py-1 backdrop-blur-xl font-mono text-xs font-semibold text-[#2997ff]">
               SCORE: {score}
             </div>
           </div>
+        ) : (
+          <div className="text-xs font-mono text-[#86868b]">LIGHT SPEED 1.0c</div>
         )}
       </header>
 
@@ -1502,13 +1596,13 @@ export default function SpaceRunnerGame({
 
             <div>
               <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3.5 py-1 text-xs font-semibold text-[#34c759] uppercase tracking-wider">
-                {selectedPlanet.name.toUpperCase()} ORBIT ACHIEVED • 5:00 FLIGHT COMPLETE
+                {selectedPlanet.name.toUpperCase()} ORBIT ACHIEVED • {selectedDuration}s FLIGHT COMPLETE
               </span>
               <h2 className="mt-2 text-4xl font-extrabold tracking-tight apple-headline text-white">
                 VICTORY! MISSION COMPLETE
               </h2>
               <p className="mt-2 text-xs text-[#86868b] leading-relaxed">
-                You survived the full 5-minute deep space transit on <strong>{diffConfig.name}</strong> mode, repelled hostile alien incursions, slingshotted meteorites, and safely entered {selectedPlanet.name} planetary orbit!
+                You survived the {selectedDuration}-second light-speed transit on <strong>{diffConfig.name}</strong> mode, repelled hostile alien incursions, slingshotted meteorites, and safely entered {selectedPlanet.name} planetary orbit!
               </p>
             </div>
 
