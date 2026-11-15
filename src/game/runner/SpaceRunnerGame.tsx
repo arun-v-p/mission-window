@@ -10,15 +10,156 @@ import {
   ArrowLeft,
   ArrowRight,
   Flame,
+  Clock,
+  Compass,
+  Target,
+  Sparkles,
+  CheckCircle,
 } from 'lucide-react'
-import { Group, Mesh, MathUtils } from 'three'
+import { Group, Mesh, MathUtils, DoubleSide } from 'three'
 import { audioTelemetry } from '../../utils/audioTelemetry'
 
-type GamePhase = 'launching' | 'playing' | 'gameover' | 'victory'
+export type GamePhase = 'briefing' | 'launching' | 'playing' | 'gameover' | 'victory'
+export type Difficulty = 'easy' | 'medium' | 'hard'
+
+export interface PlanetOption {
+  id: string
+  name: string
+  category: string
+  distanceKm: string
+  color: string
+  emissive: string
+  glowColor: string
+  accentColor: string
+  hasRings?: boolean
+  ringColor?: string
+  tag: string
+  description: string
+  lore: string
+}
+
+export interface DifficultyConfig {
+  id: Difficulty
+  name: string
+  label: string
+  description: string
+  asteroidSpeed: number
+  alienSpeed: number
+  spawnIntervalMs: number
+  alienChance: number
+  asteroidHealth: number
+  alienHealth: number
+  colorBadge: string
+}
+
+export const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
+  easy: {
+    id: 'easy',
+    name: 'Easy',
+    label: 'Cadet Flight',
+    description: 'Slower asteroid drift, spaced-out spawns, single-hit alien scouts.',
+    asteroidSpeed: 0.85,
+    alienSpeed: 1.05,
+    spawnIntervalMs: 1700,
+    alienChance: 0.35,
+    asteroidHealth: 1,
+    alienHealth: 2,
+    colorBadge: '#34c759',
+  },
+  medium: {
+    id: 'medium',
+    name: 'Medium',
+    label: 'Standard Orbit',
+    description: 'Balanced meteorite belt density, tactical alien cruisers, standard velocity.',
+    asteroidSpeed: 1.25,
+    alienSpeed: 1.55,
+    spawnIntervalMs: 1150,
+    alienChance: 0.48,
+    asteroidHealth: 1,
+    alienHealth: 3,
+    colorBadge: '#2997ff',
+  },
+  hard: {
+    id: 'hard',
+    name: 'Hard',
+    label: 'Hyperdrive Chaos',
+    description: 'Blistering speed, dense meteorite storms, heavy armored alien interceptors.',
+    asteroidSpeed: 1.7,
+    alienSpeed: 2.15,
+    spawnIntervalMs: 700,
+    alienChance: 0.6,
+    asteroidHealth: 2,
+    alienHealth: 4,
+    colorBadge: '#ff3b30',
+  },
+}
+
+export const PLANETS: PlanetOption[] = [
+  {
+    id: 'mars',
+    name: 'Mars',
+    category: 'The Red Planet',
+    distanceKm: '225,000,000 km',
+    color: '#d44919',
+    emissive: '#8c2805',
+    glowColor: '#ff7a45',
+    accentColor: '#ff6b4a',
+    tag: 'Red Frontier',
+    description: 'Traverse the inner solar belt past Deimos and Phobos toward Olympus Mons.',
+    lore: 'Heavy asteroid fields encountered around Martian gravity well.',
+  },
+  {
+    id: 'moon',
+    name: 'The Moon (Luna)',
+    category: 'Earth Satellite',
+    distanceKm: '384,400 km',
+    color: '#b0b3b8',
+    emissive: '#3a3d42',
+    glowColor: '#d6e4ff',
+    accentColor: '#98989d',
+    tag: 'Lunar Base',
+    description: 'Intercept orbital lunar research stations above the Sea of Tranquility.',
+    lore: 'Hostile alien reconnaissance crafts spotted in lunar shadow craters.',
+  },
+  {
+    id: 'jupiter',
+    name: 'Jupiter / Europa',
+    category: 'Gas Giant System',
+    distanceKm: '628,000,000 km',
+    color: '#d49b55',
+    emissive: '#7a4e1d',
+    glowColor: '#ffd166',
+    accentColor: '#ff9f0a',
+    tag: 'Outer Giants',
+    description: 'Navigate Jovian radiation storms to establish orbit above icy oceanic Europa.',
+    lore: 'High electromagnetic pulse interference and dense debris vortex.',
+  },
+  {
+    id: 'titan',
+    name: 'Titan (Saturn)',
+    category: 'Ringed Moon',
+    distanceKm: '1,400,000,000 km',
+    color: '#e5a13b',
+    emissive: '#824b0c',
+    glowColor: '#ffb340',
+    accentColor: '#bf5af2',
+    hasRings: true,
+    ringColor: '#d1b280',
+    tag: 'Deep Frontier',
+    description: 'Warp past Saturn’s gleaming ice rings into dense methane atmospheric clouds.',
+    lore: 'Deep space armada guarding the outer planetary perimeter.',
+  },
+]
 
 interface LaserBolt {
   id: number
   x: number
+  z: number
+}
+
+interface MeteorShard {
+  id: number
+  lane: number
   z: number
 }
 
@@ -29,22 +170,98 @@ interface Obstacle {
   z: number
   speed: number
   health: number
+  maxHealth: number
   rotationSpeed: number
 }
 
 const LANES = [-3.2, 0, 3.2]
+const GAME_DURATION_SECONDS = 300 // 5 full minutes!
 
-// --- 3D SCENE COMPONENTS ---
+// --- 3D SCENE GRAPHICS COMPONENTS ---
 
-// Player's Spacecraft with Animated Thrusters
+// 1. Futuristic 3-Lane Laser Highway Runway (Subway Surfers in Deep Space)
+function SpaceRunwayLanes({ currentLane }: { currentLane: number }) {
+  const gridRef = useRef<Group>(null)
+
+  useFrame((_, delta) => {
+    if (gridRef.current) {
+      gridRef.current.children.forEach((child) => {
+        child.position.z += 50 * delta
+        if (child.position.z > 15) {
+          child.position.z -= 120
+        }
+      })
+    }
+  })
+
+  return (
+    <group position={[0, -1.05, 0]}>
+      {/* 4 Neon Guideway Rails */}
+      {[-4.8, -1.6, 1.6, 4.8].map((x, i) => (
+        <mesh key={i} position={[x, 0, -45]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.06, 120]} />
+          <meshBasicMaterial color="#0071e3" transparent opacity={0.35} />
+        </mesh>
+      ))}
+
+      {/* Active Glowing Lane under player ship */}
+      <mesh
+        position={[LANES[currentLane + 1] || 0, 0.01, -12]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <planeGeometry args={[2.8, 32]} />
+        <meshBasicMaterial color="#2997ff" transparent opacity={0.12} />
+      </mesh>
+
+      {/* Fast scrolling speed chevrons */}
+      <group ref={gridRef}>
+        {Array.from({ length: 12 }).map((_, i) => (
+          <mesh key={i} position={[0, 0.02, -i * 10]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[9.6, 0.14]} />
+            <meshBasicMaterial color="#2997ff" transparent opacity={0.22} />
+          </mesh>
+        ))}
+      </group>
+    </group>
+  )
+}
+
+// 2. Volumetric Deep-Space Nebula Clouds
+function CosmicNebula() {
+  return (
+    <group position={[0, 0, -110]}>
+      {/* Violet Deep Space Nebula */}
+      <mesh position={[-28, 14, -10]}>
+        <sphereGeometry args={[22, 16, 16]} />
+        <meshBasicMaterial color="#581c87" transparent opacity={0.12} />
+      </mesh>
+      {/* Cyan Hyperdrive Cloud */}
+      <mesh position={[30, -12, -25]}>
+        <sphereGeometry args={[25, 16, 16]} />
+        <meshBasicMaterial color="#0369a1" transparent opacity={0.14} />
+      </mesh>
+      {/* Golden Stellar Corona */}
+      <mesh position={[0, 26, -40]}>
+        <sphereGeometry args={[30, 16, 16]} />
+        <meshBasicMaterial color="#7c2d12" transparent opacity={0.09} />
+      </mesh>
+    </group>
+  )
+}
+
+// 3. Player's AAA Aerospace Spacecraft with Animated Thruster Plumes & Shield
 function PlayerShip({
   targetLane,
   isRolling,
+  isShielded,
 }: {
   targetLane: number
   isRolling: number
+  isShielded: boolean
 }) {
   const groupRef = useRef<Group>(null)
+  const thrustersRef = useRef<Group>(null)
+  const shieldRef = useRef<Mesh>(null)
   const currentX = useRef(LANES[targetLane + 1] || 0)
   const targetX = LANES[targetLane + 1] || 0
 
@@ -53,7 +270,7 @@ function PlayerShip({
     currentX.current = MathUtils.damp(currentX.current, targetX, 14, delta)
     groupRef.current.position.x = currentX.current
 
-    // Bank / roll ship when changing lanes
+    // Bank / roll ship when changing lanes with smooth inertia
     const targetRoll = (targetX - currentX.current) * -0.22 + isRolling * 0.05
     groupRef.current.rotation.z = MathUtils.damp(
       groupRef.current.rotation.z,
@@ -62,68 +279,117 @@ function PlayerShip({
       delta,
     )
     groupRef.current.rotation.x = Math.sin(Date.now() * 0.005) * 0.04
+
+    // Dynamic thruster plasma flame pulsation
+    if (thrustersRef.current) {
+      const pulse = 1 + Math.sin(Date.now() * 0.035) * 0.2 + Math.random() * 0.12
+      thrustersRef.current.scale.set(1, 1, pulse)
+    }
+
+    // Shield rotation
+    if (shieldRef.current && isShielded) {
+      shieldRef.current.rotation.y += 1.8 * delta
+      shieldRef.current.rotation.x += 1.2 * delta
+    }
   })
 
   return (
     <group ref={groupRef} position={[0, -0.4, 0]}>
-      {/* Sleek Fighter Fuselage */}
-      <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.55, 2.2, 5]} />
-        <meshStandardMaterial color="#f0f2f5" metalness={0.8} roughness={0.2} />
+      {/* Sleek Aerodynamic Fuselage (Titanium / Matte Carbon) */}
+      <mesh position={[0, 0, -0.2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.5, 2.4, 6]} />
+        <meshStandardMaterial color="#f0f2f5" metalness={0.9} roughness={0.15} />
       </mesh>
 
-      {/* Cockpit Canopy */}
-      <mesh position={[0, 0.22, -0.15]}>
-        <sphereGeometry args={[0.26, 12, 12]} />
+      {/* Main Cockpit Canopy (Sapphire crystal with blue HUD glow) */}
+      <mesh position={[0, 0.23, -0.1]}>
+        <sphereGeometry args={[0.26, 16, 16]} />
         <meshStandardMaterial
           color="#2997ff"
           emissive="#0071e3"
-          emissiveIntensity={0.6}
+          emissiveIntensity={0.8}
           metalness={0.9}
           roughness={0.1}
         />
       </mesh>
 
-      {/* Delta Wings */}
-      <mesh position={[0, -0.05, 0.4]}>
-        <boxGeometry args={[2.4, 0.06, 0.9]} />
-        <meshStandardMaterial color="#1c1c1e" metalness={0.7} roughness={0.3} />
+      {/* Swept Stealth Delta Wings */}
+      <mesh position={[0, -0.06, 0.45]}>
+        <boxGeometry args={[2.5, 0.06, 1.0]} />
+        <meshStandardMaterial color="#1c1c1e" metalness={0.85} roughness={0.25} />
       </mesh>
 
-      {/* Left Laser Cannon */}
-      <mesh position={[-1.1, -0.02, 0.2]}>
-        <cylinderGeometry args={[0.04, 0.05, 0.8, 8]} />
-        <meshStandardMaterial color="#2997ff" metalness={0.9} roughness={0.1} />
+      {/* Wingtip Navigation Lights */}
+      {/* Left Wingtip: Port Red */}
+      <mesh position={[-1.25, -0.04, 0.5]}>
+        <sphereGeometry args={[0.06, 8, 8]} />
+        <meshStandardMaterial color="#ff453a" emissive="#ff453a" emissiveIntensity={2.5} />
+      </mesh>
+      {/* Right Wingtip: Starboard Green */}
+      <mesh position={[1.25, -0.04, 0.5]}>
+        <sphereGeometry args={[0.06, 8, 8]} />
+        <meshStandardMaterial color="#30d158" emissive="#30d158" emissiveIntensity={2.5} />
       </mesh>
 
-      {/* Right Laser Cannon */}
-      <mesh position={[1.1, -0.02, 0.2]}>
-        <cylinderGeometry args={[0.04, 0.05, 0.8, 8]} />
-        <meshStandardMaterial color="#2997ff" metalness={0.9} roughness={0.1} />
+      {/* Heavy Dual Laser Cannon Pods */}
+      <mesh position={[-1.05, -0.03, 0.15]}>
+        <cylinderGeometry args={[0.05, 0.06, 0.9, 10]} />
+        <meshStandardMaterial color="#2997ff" metalness={0.95} roughness={0.1} />
+      </mesh>
+      <mesh position={[1.05, -0.03, 0.15]}>
+        <cylinderGeometry args={[0.05, 0.06, 0.9, 10]} />
+        <meshStandardMaterial color="#2997ff" metalness={0.95} roughness={0.1} />
       </mesh>
 
-      {/* Dual Thruster Glow Engines */}
-      <mesh position={[-0.3, -0.05, 1.1]}>
-        <cylinderGeometry args={[0.12, 0.16, 0.35, 12]} />
-        <meshStandardMaterial color="#0071e3" emissive="#2997ff" emissiveIntensity={1.2} />
+      {/* Twin Plasma Thruster Engines */}
+      <mesh position={[-0.32, -0.06, 1.1]}>
+        <cylinderGeometry args={[0.13, 0.18, 0.38, 14]} />
+        <meshStandardMaterial color="#0071e3" emissive="#0071e3" emissiveIntensity={1.0} />
       </mesh>
-      <mesh position={[0.3, -0.05, 1.1]}>
-        <cylinderGeometry args={[0.12, 0.16, 0.35, 12]} />
-        <meshStandardMaterial color="#0071e3" emissive="#2997ff" emissiveIntensity={1.2} />
+      <mesh position={[0.32, -0.06, 1.1]}>
+        <cylinderGeometry args={[0.13, 0.18, 0.38, 14]} />
+        <meshStandardMaterial color="#0071e3" emissive="#0071e3" emissiveIntensity={1.0} />
       </mesh>
+
+      {/* Animated Ion Flame Cones */}
+      <group ref={thrustersRef}>
+        <mesh position={[-0.32, -0.06, 1.6]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.14, 0.75, 12]} />
+          <meshBasicMaterial color="#38bdf8" />
+        </mesh>
+        <mesh position={[0.32, -0.06, 1.6]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.14, 0.75, 12]} />
+          <meshBasicMaterial color="#38bdf8" />
+        </mesh>
+      </group>
+
+      {/* Invulnerability Energy Shield Sphere */}
+      {isShielded && (
+        <mesh ref={shieldRef} position={[0, 0, 0]}>
+          <sphereGeometry args={[1.7, 18, 18]} />
+          <meshStandardMaterial
+            color="#38bdf8"
+            emissive="#0284c7"
+            emissiveIntensity={1.2}
+            transparent
+            opacity={0.35}
+            wireframe
+          />
+        </mesh>
+      )}
     </group>
   )
 }
 
-// Hyperdrive Streaking Warp Stars
+// 4. Hyperdrive Streaking Warp Stars
 function WarpSpeedStars({ isWarping }: { isWarping: boolean }) {
-  const count = 350
+  const count = 380
   const stars = useMemo(() => {
     return Array.from({ length: count }, () => ({
-      x: (Math.random() - 0.5) * 35,
-      y: (Math.random() - 0.5) * 22,
+      x: (Math.random() - 0.5) * 38,
+      y: (Math.random() - 0.5) * 24,
       z: -Math.random() * 120,
-      length: Math.random() * 3 + 1.5,
+      length: Math.random() * 3 + 1.8,
     }))
   }, [])
 
@@ -131,11 +397,11 @@ function WarpSpeedStars({ isWarping }: { isWarping: boolean }) {
 
   useFrame((_, delta) => {
     if (!starsRef.current) return
-    const speed = isWarping ? 75 : 12
+    const speed = isWarping ? 80 : 14
     starsRef.current.children.forEach((child) => {
       child.position.z += speed * delta
       if (child.position.z > 15) {
-        child.position.z = -110
+        child.position.z = -115
       }
     })
   })
@@ -145,19 +411,15 @@ function WarpSpeedStars({ isWarping }: { isWarping: boolean }) {
       {stars.map((star, i) => (
         <mesh key={i} position={[star.x, star.y, star.z]}>
           <boxGeometry args={[0.06, 0.06, isWarping ? star.length * 2.8 : 0.35]} />
-          <meshBasicMaterial color={i % 3 === 0 ? '#2997ff' : '#ffffff'} />
+          <meshBasicMaterial color={i % 3 === 0 ? '#38bdf8' : i % 5 === 0 ? '#ff7a45' : '#ffffff'} />
         </mesh>
       ))}
     </group>
   )
 }
 
-// 3D Asteroid Rock
-function AsteroidMesh({
-  obstacle,
-}: {
-  obstacle: Obstacle
-}) {
+// 5. Rugged 3D Asteroid Rock with Molten Magma Cracks
+function AsteroidMesh({ obstacle }: { obstacle: Obstacle }) {
   const meshRef = useRef<Mesh>(null)
 
   useFrame((_, delta) => {
@@ -167,114 +429,184 @@ function AsteroidMesh({
     }
   })
 
+  const isDamaged = obstacle.health < obstacle.maxHealth
+
   return (
-    <mesh
-      ref={meshRef}
-      position={[LANES[obstacle.lane + 1], 0, obstacle.z]}
-    >
-      <dodecahedronGeometry args={[0.75, 1]} />
+    <mesh ref={meshRef} position={[LANES[obstacle.lane + 1], 0, obstacle.z]}>
+      <dodecahedronGeometry args={[0.82, 1]} />
       <meshStandardMaterial
-        color="#8e8e93"
-        roughness={0.88}
-        metalness={0.2}
+        color={isDamaged ? '#ef4444' : '#64748b'}
+        emissive={isDamaged ? '#b91c1c' : '#000000'}
+        emissiveIntensity={isDamaged ? 0.6 : 0}
+        roughness={0.92}
+        metalness={0.25}
       />
     </mesh>
   )
 }
 
-// 3D Alien Fighter Vessel
-function AlienFighterMesh({
-  obstacle,
-}: {
-  obstacle: Obstacle
-}) {
+// 6. Bio-Mechanical 3D Alien War Cruiser with Pulsing Reactor Core
+function AlienFighterMesh({ obstacle }: { obstacle: Obstacle }) {
   const groupRef = useRef<Group>(null)
+  const coreRef = useRef<Mesh>(null)
 
   useFrame(() => {
     if (groupRef.current) {
       groupRef.current.rotation.z = Math.sin(Date.now() * 0.008) * 0.25
     }
+    if (coreRef.current) {
+      const pulse = 1 + Math.sin(Date.now() * 0.012) * 0.25
+      coreRef.current.scale.set(pulse, pulse, pulse)
+    }
   })
 
   return (
-    <group
-      ref={groupRef}
-      position={[LANES[obstacle.lane + 1], 0, obstacle.z]}
-    >
-      {/* Alien Saucer / Wing */}
+    <group ref={groupRef} position={[LANES[obstacle.lane + 1], 0, obstacle.z]}>
+      {/* Obsidian Bio-Mechanical Hull */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.9, 0.4, 0.22, 6]} />
+        <cylinderGeometry args={[0.95, 0.45, 0.24, 6]} />
         <meshStandardMaterial
-          color="#300a4d"
-          emissive="#7822c9"
-          emissiveIntensity={0.6}
-          metalness={0.8}
+          color="#1e1035"
+          emissive="#581c87"
+          emissiveIntensity={0.5}
+          metalness={0.85}
           roughness={0.2}
         />
       </mesh>
 
-      {/* Alien Eye / Core */}
-      <mesh position={[0, 0.15, -0.1]}>
+      {/* Forward Attack Mandibles */}
+      <mesh position={[-0.45, 0, -0.6]} rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.15, 0.8, 4]} />
+        <meshStandardMaterial color="#0f051d" metalness={0.9} />
+      </mesh>
+      <mesh position={[0.45, 0, -0.6]} rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.15, 0.8, 4]} />
+        <meshStandardMaterial color="#0f051d" metalness={0.9} />
+      </mesh>
+
+      {/* Pulsing Biomechanical Plasma Eye Core */}
+      <mesh ref={coreRef} position={[0, 0.16, -0.1]}>
         <sphereGeometry args={[0.3, 16, 16]} />
         <meshStandardMaterial
-          color="#ff2d55"
-          emissive="#ff375f"
-          emissiveIntensity={1.8}
+          color="#ff0055"
+          emissive="#ff0055"
+          emissiveIntensity={2.2}
         />
       </mesh>
+
+      {/* Rear Plasma Exhaust Cones */}
+      <mesh position={[0, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.18, 0.12, 0.35, 8]} />
+        <meshStandardMaterial color="#a855f7" emissive="#a855f7" emissiveIntensity={1.5} />
+      </mesh>
+
+      {/* Health Pip indicator for heavy cruisers */}
+      {obstacle.maxHealth > 1 && (
+        <mesh position={[0, 0.65, 0]}>
+          <boxGeometry args={[obstacle.health * 0.35, 0.06, 0.06]} />
+          <meshBasicMaterial color="#ff0055" />
+        </mesh>
+      )}
     </group>
   )
 }
 
-// Laser Bolts
+// 7. High-Energy Laser Bolts
 function LaserBoltMesh({ bolt }: { bolt: LaserBolt }) {
   return (
     <group position={[bolt.x, -0.4, bolt.z]}>
-      <mesh position={[-1.1, 0, 0]}>
-        <boxGeometry args={[0.07, 0.07, 1.4]} />
-        <meshBasicMaterial color="#30b0c7" />
+      {/* Left Laser */}
+      <mesh position={[-1.05, 0, 0]}>
+        <boxGeometry args={[0.08, 0.08, 1.6]} />
+        <meshBasicMaterial color="#38bdf8" />
       </mesh>
-      <mesh position={[1.1, 0, 0]}>
-        <boxGeometry args={[0.07, 0.07, 1.4]} />
-        <meshBasicMaterial color="#30b0c7" />
+      {/* Right Laser */}
+      <mesh position={[1.05, 0, 0]}>
+        <boxGeometry args={[0.08, 0.08, 1.6]} />
+        <meshBasicMaterial color="#38bdf8" />
       </mesh>
     </group>
   )
 }
 
-// Destination Target Planet (The Moon or Mars at 100%)
-function DestinationPlanet({ progress }: { progress: number }) {
+// 8. Slingshot Kinetic Meteor Shard
+function MeteorShardMesh({ shard }: { shard: MeteorShard }) {
+  const meshRef = useRef<Mesh>(null)
+
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.x += 12 * delta
+      meshRef.current.rotation.y += 15 * delta
+    }
+  })
+
+  return (
+    <mesh ref={meshRef} position={[LANES[shard.lane + 1], 0, shard.z]}>
+      <dodecahedronGeometry args={[0.48, 0]} />
+      <meshStandardMaterial
+        color="#ff7a00"
+        emissive="#ff3b30"
+        emissiveIntensity={1.8}
+        roughness={0.4}
+      />
+    </mesh>
+  )
+}
+
+// 9. Destination Target Planet with Dynamic Corona & Saturnian Rings
+function DestinationPlanet({
+  progress,
+  planet,
+}: {
+  progress: number
+  planet: PlanetOption
+}) {
   const zPos = -120 + progress * 0.95
-  const s = 3.5 + progress * 0.08
+  const s = 3.6 + progress * 0.08
 
   return (
     <group position={[0, 0, zPos]} scale={[s, s, s]}>
-      {/* Red Planet Mars / Moon */}
+      {/* Main Planetary Sphere */}
       <mesh>
         <sphereGeometry args={[1, 32, 32]} />
         <meshStandardMaterial
-          color="#ff6b4a"
-          roughness={0.75}
-          metalness={0.1}
+          color={planet.color}
+          roughness={0.7}
+          metalness={0.15}
+          emissive={planet.emissive}
+          emissiveIntensity={0.3}
         />
       </mesh>
 
-      {/* Atmospheric Glow */}
-      <mesh scale={[1.08, 1.08, 1.08]}>
+      {/* Atmospheric Corona */}
+      <mesh scale={[1.09, 1.09, 1.09]}>
         <sphereGeometry args={[1, 24, 24]} />
         <meshStandardMaterial
-          color="#ff9f0a"
+          color={planet.glowColor}
           transparent
-          opacity={0.25}
-          emissive="#ff6b4a"
-          emissiveIntensity={0.5}
+          opacity={0.3}
+          emissive={planet.glowColor}
+          emissiveIntensity={0.6}
         />
       </mesh>
+
+      {/* Saturnian Rings (if Titan/Saturn selected) */}
+      {planet.hasRings && (
+        <mesh rotation={[Math.PI / 3, 0.25, 0]}>
+          <ringGeometry args={[1.35, 2.45, 48]} />
+          <meshStandardMaterial
+            color={planet.ringColor || '#d1b280'}
+            side={DoubleSide}
+            transparent
+            opacity={0.7}
+          />
+        </mesh>
+      )}
     </group>
   )
 }
 
-// 3D Cinematic Launch Scene
+// 10. Cape Canaveral Launchpad Rocket
 function LaunchRocket({ altitude }: { altitude: number }) {
   return (
     <group position={[0, altitude - 2.5, -4]}>
@@ -303,34 +635,63 @@ function LaunchRocket({ altitude }: { altitude: number }) {
   )
 }
 
+// Time formatter
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+}
+
 // --- MAIN RUNNER COMPONENT ---
 export default function SpaceRunnerGame({
   onExit,
 }: {
   onExit: () => void
 }) {
-  const [phase, setPhase] = useState<GamePhase>('launching')
+  // Pre-game configuration states
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('medium')
+  const [selectedPlanet, setSelectedPlanet] = useState<PlanetOption>(PLANETS[0])
+
+  // Game loop phases: starts at 'briefing' prompt!
+  const [phase, setPhase] = useState<GamePhase>('briefing')
   const [launchCountdown, setLaunchCountdown] = useState(3)
   const [launchAltitude, setLaunchAltitude] = useState(0)
 
-  // Game gameplay states
+  // Gameplay states
   const [targetLane, setTargetLane] = useState(0) // -1, 0, 1
   const [lives, setLives] = useState(3)
-  const [checkpoint, setCheckpoint] = useState(0) // 0%, 33%, 66%
-  const [distance, setDistance] = useState(0) // 0 to 100%
+  const [elapsedSeconds, setElapsedSeconds] = useState(0) // 0 to 300 seconds (5 mins)
+  const [checkpointTime, setCheckpointTime] = useState(0) // 0s, 100s, 200s
   const [score, setScore] = useState(0)
   const [aliensDestroyed, setAliensDestroyed] = useState(0)
   const [asteroidsDestroyed, setAsteroidsDestroyed] = useState(0)
+  const [slingshotCombos, setSlingshotCombos] = useState(0)
   const [flashDamage, setFlashDamage] = useState(false)
+  const [isShielded, setIsShielded] = useState(false)
   const [checkpointNotification, setCheckpointNotification] = useState<string | null>(null)
+  const [comboBanner, setComboBanner] = useState<string | null>(null)
 
   // Entities
   const [lasers, setLasers] = useState<LaserBolt[]>([])
+  const [meteorShards, setMeteorShards] = useState<MeteorShard[]>([])
   const [obstacles, setObstacles] = useState<Obstacle[]>([])
 
   const nextId = useRef(1)
   const lastSpawn = useRef(0)
   const rolling = useRef(0)
+  const invulnerableUntil = useRef(0)
+
+  const diffConfig = DIFFICULTIES[selectedDifficulty]
+  const progressPercent = Math.min(100, (elapsedSeconds / GAME_DURATION_SECONDS) * 100)
+  const remainingSeconds = Math.max(0, GAME_DURATION_SECONDS - elapsedSeconds)
+
+  // Start launch countdown from briefing screen
+  const startLaunchSequence = () => {
+    audioTelemetry.playClick()
+    setPhase('launching')
+    setLaunchCountdown(3)
+    setLaunchAltitude(0)
+  }
 
   // 1. Launchpad Countdown & Ascend Animation
   useEffect(() => {
@@ -364,7 +725,7 @@ export default function SpaceRunnerGame({
     return () => clearInterval(interval)
   }, [phase])
 
-  // Skip launch straight to light speed
+  // Skip launch straight into light speed
   const skipLaunch = () => {
     audioTelemetry.playWarpJump()
     setPhase('playing')
@@ -422,45 +783,49 @@ export default function SpaceRunnerGame({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [phase, moveLeft, moveRight, fireLaser])
 
-  // 4. Game Loop: Movement, Spawning, Collisions, Distance
+  // 4. Game Loop: Movement, Spawning, Collisions, 5-Minute Flight Timer
   useEffect(() => {
     if (phase !== 'playing') return
 
+    const tickMs = 35
     const loop = setInterval(() => {
-      // Advance distance progress toward 100%
-      setDistance((dist) => {
-        const nextDist = dist + 0.35
+      // Advance flight time towards 5 minutes (300 seconds)
+      setElapsedSeconds((sec) => {
+        const nextSec = sec + tickMs / 1000
 
-        // Checkpoint 1 (Alpha) at 33%
-        if (dist < 33 && nextDist >= 33) {
-          setCheckpoint(33)
-          setCheckpointNotification('CHECKPOINT ALPHA REACHED (33%)')
+        // Checkpoint 1 (Alpha) at 33% (100 seconds / 01:40)
+        if (sec < 100 && nextSec >= 100) {
+          setCheckpointTime(100)
+          setCheckpointNotification('CHECKPOINT ALPHA REACHED (33% • 01:40)')
           audioTelemetry.playCheckpoint()
           setTimeout(() => setCheckpointNotification(null), 3000)
         }
 
-        // Checkpoint 2 (Bravo) at 66%
-        if (dist < 66 && nextDist >= 66) {
-          setCheckpoint(66)
-          setCheckpointNotification('CHECKPOINT BRAVO REACHED (66%)')
+        // Checkpoint 2 (Bravo) at 66% (200 seconds / 03:20)
+        if (sec < 200 && nextSec >= 200) {
+          setCheckpointTime(200)
+          setCheckpointNotification('CHECKPOINT BRAVO REACHED (66% • 03:20)')
           audioTelemetry.playCheckpoint()
           setTimeout(() => setCheckpointNotification(null), 3000)
         }
 
-        // 100% Victory!
-        if (nextDist >= 100) {
+        // 100% Planetary Orbit Arrival (300 seconds / 05:00)
+        if (nextSec >= GAME_DURATION_SECONDS) {
           setPhase('victory')
           audioTelemetry.playMissionSuccess()
-          return 100
+          return GAME_DURATION_SECONDS
         }
-        return nextDist
+        return nextSec
       })
 
-      // Spawn Obstacles (Asteroids & Alien Ships)
+      // Update Shield state
+      setIsShielded(Date.now() < invulnerableUntil.current)
+
+      // Spawn Obstacles according to difficulty configuration
       const now = Date.now()
-      if (now - lastSpawn.current > 1200) {
+      if (now - lastSpawn.current > diffConfig.spawnIntervalMs) {
         lastSpawn.current = now
-        const isAlien = Math.random() > 0.45
+        const isAlien = Math.random() < diffConfig.alienChance
         const lane = [-1, 0, 1][Math.floor(Math.random() * 3)]
 
         setObstacles((prev) => [
@@ -470,8 +835,9 @@ export default function SpaceRunnerGame({
             type: isAlien ? 'alien' : 'asteroid',
             lane,
             z: -95,
-            speed: isAlien ? 1.6 : 1.3,
-            health: isAlien ? 2 : 1,
+            speed: isAlien ? diffConfig.alienSpeed : diffConfig.asteroidSpeed,
+            health: isAlien ? diffConfig.alienHealth : diffConfig.asteroidHealth,
+            maxHealth: isAlien ? diffConfig.alienHealth : diffConfig.asteroidHealth,
             rotationSpeed: Math.random() * 2 + 1,
           },
         ])
@@ -484,15 +850,55 @@ export default function SpaceRunnerGame({
           .filter((bolt) => bolt.z > -100),
       )
 
+      // Move Slingshot Meteor Shards forward
+      setMeteorShards((prev) =>
+        prev
+          .map((shard) => ({ ...shard, z: shard.z - 3.8 }))
+          .filter((shard) => shard.z > -100),
+      )
+
+      // Test Meteor Shard impacts into oncoming Alien Ships (Meteor Slingshot Mechanic!)
+      setMeteorShards((currentShards) => {
+        let keptShards = [...currentShards]
+
+        setObstacles((currentObs) => {
+          return currentObs.filter((obs) => {
+            if (obs.type !== 'alien') return true
+
+            const hittingShardIndex = keptShards.findIndex(
+              (s) => s.lane === obs.lane && Math.abs(s.z - obs.z) < 3.2,
+            )
+
+            if (hittingShardIndex !== -1) {
+              // Obliterated by slingshot meteor!
+              audioTelemetry.playExplosion()
+              setAliensDestroyed((c) => c + 1)
+              setSlingshotCombos((c) => c + 1)
+              setScore((s) => s + 750)
+              setComboBanner('☄️ METEOR SLINGSHOT COMBO! +750 PTS')
+              setTimeout(() => setComboBanner(null), 2500)
+
+              // Remove the shard that collided
+              keptShards = keptShards.filter((_, idx) => idx !== hittingShardIndex)
+              return false // Alien destroyed
+            }
+            return true
+          })
+        })
+
+        return keptShards
+      })
+
       // Move Obstacles backward toward player & test collisions
       setObstacles((prev) => {
         const updated: Obstacle[] = []
 
         prev.forEach((obstacle) => {
-          const nextZ = obstacle.z + obstacle.speed * 1.5
+          const nextZ = obstacle.z + obstacle.speed * 1.4
 
           // Test laser hits
           let destroyedByLaser = false
+
           setLasers((currentLasers) => {
             const hitIndex = currentLasers.findIndex(
               (bolt) =>
@@ -501,17 +907,33 @@ export default function SpaceRunnerGame({
             )
 
             if (hitIndex !== -1) {
-              destroyedByLaser = true
-              audioTelemetry.playExplosion()
+              obstacle.health -= 1
 
-              if (obstacle.type === 'alien') {
-                setAliensDestroyed((c) => c + 1)
-                setScore((s) => s + 350)
+              if (obstacle.health <= 0) {
+                destroyedByLaser = true
+                audioTelemetry.playExplosion()
+
+                if (obstacle.type === 'alien') {
+                  setAliensDestroyed((c) => c + 1)
+                  setScore((s) => s + 350)
+                } else {
+                  // Asteroid shattered! Throw a kinetic meteor shard forward into the lane!
+                  setAsteroidsDestroyed((c) => c + 1)
+                  setScore((s) => s + 150)
+                  setMeteorShards((shards) => [
+                    ...shards,
+                    {
+                      id: nextId.current++,
+                      lane: obstacle.lane,
+                      z: obstacle.z - 2.0,
+                    },
+                  ])
+                }
               } else {
-                setAsteroidsDestroyed((c) => c + 1)
-                setScore((s) => s + 150)
+                audioTelemetry.playClick()
               }
-              // Remove consumed laser
+
+              // Remove consumed laser bolt
               return currentLasers.filter((_, idx) => idx !== hitIndex)
             }
             return currentLasers
@@ -520,7 +942,9 @@ export default function SpaceRunnerGame({
           if (destroyedByLaser) return
 
           // Test player collision (at z ≈ 0)
+          const isInvulnerable = Date.now() < invulnerableUntil.current
           if (
+            !isInvulnerable &&
             Math.abs(nextZ - 0) < 1.4 &&
             obstacle.lane === targetLane
           ) {
@@ -536,10 +960,13 @@ export default function SpaceRunnerGame({
                 audioTelemetry.playWarningAlert()
                 return 0
               } else {
-                // Respawn at last checkpoint!
-                setDistance(checkpoint)
-                setCheckpointNotification(`RESPAWNING AT CHECKPOINT (${checkpoint}%)`)
-                setTimeout(() => setCheckpointNotification(null), 2500)
+                // Respawn at last checkpoint with invulnerability grace period!
+                setElapsedSeconds(checkpointTime)
+                invulnerableUntil.current = Date.now() + 3000 // 3 seconds shield
+                setCheckpointNotification(
+                  `RESPAWNING AT CHECKPOINT (${Math.round((checkpointTime / GAME_DURATION_SECONDS) * 100)}% • SHIELD ACTIVE)`,
+                )
+                setTimeout(() => setCheckpointNotification(null), 2800)
                 return remaining
               }
             })
@@ -554,24 +981,26 @@ export default function SpaceRunnerGame({
 
         return updated
       })
-    }, 35)
+    }, tickMs)
 
     return () => clearInterval(loop)
-  }, [phase, targetLane, checkpoint])
+  }, [phase, targetLane, checkpointTime, diffConfig])
 
   // Restart from beginning after gameover
   const restartFromBeginning = () => {
     setLives(3)
-    setCheckpoint(0)
-    setDistance(0)
+    setElapsedSeconds(0)
+    setCheckpointTime(0)
     setScore(0)
     setAliensDestroyed(0)
     setAsteroidsDestroyed(0)
+    setSlingshotCombos(0)
     setObstacles([])
     setLasers([])
+    setMeteorShards([])
     setLaunchCountdown(3)
     setLaunchAltitude(0)
-    setPhase('launching')
+    setPhase('briefing')
   }
 
   return (
@@ -583,12 +1012,13 @@ export default function SpaceRunnerGame({
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 2.2, 5.5], fov: 60 }}
+        camera={{ position: [0, 2.3, 5.6], fov: 60 }}
         className="absolute inset-0 z-0"
       >
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[10, 20, 15]} intensity={1.5} />
-        <pointLight position={[0, 0, 0]} intensity={1.2} color="#2997ff" />
+        <ambientLight intensity={0.5} color="#0c1d36" />
+        <directionalLight position={[12, 22, 16]} intensity={1.8} color="#ffffff" />
+        <pointLight position={[0, -0.4, 2.0]} intensity={1.5} color="#38bdf8" />
+        <pointLight position={[0, 0, -40]} intensity={1.2} color={selectedPlanet.glowColor} />
 
         {phase === 'launching' ? (
           <>
@@ -597,12 +1027,30 @@ export default function SpaceRunnerGame({
           </>
         ) : (
           <>
+            {/* Deep Cosmic Volumetric Nebula Clouds */}
+            <CosmicNebula />
+
+            {/* Hyperdrive Warp Stars */}
             <WarpSpeedStars isWarping={phase === 'playing'} />
-            <PlayerShip targetLane={targetLane} isRolling={rolling.current} />
+
+            {/* 3D Holographic Speed Highway Runway */}
+            <SpaceRunwayLanes currentLane={targetLane} />
+
+            {/* Player's Jet Spacecraft */}
+            <PlayerShip
+              targetLane={targetLane}
+              isRolling={rolling.current}
+              isShielded={isShielded}
+            />
 
             {/* Lasers */}
             {lasers.map((bolt) => (
               <LaserBoltMesh key={bolt.id} bolt={bolt} />
+            ))}
+
+            {/* Kinetic Slingshot Meteor Shards */}
+            {meteorShards.map((shard) => (
+              <MeteorShardMesh key={shard.id} shard={shard} />
             ))}
 
             {/* Obstacles: Asteroids and Alien Ships */}
@@ -615,14 +1063,327 @@ export default function SpaceRunnerGame({
             )}
 
             {/* Destination Planet approaching in distance */}
-            <DestinationPlanet progress={distance} />
+            <DestinationPlanet progress={progressPercent} planet={selectedPlanet} />
           </>
         )}
       </Canvas>
 
-      {/* --- HUD OVERLAYS --- */}
+      {/* --- PHASE 0: PRE-MISSION BRIEFING PROMPT (PLANET & DIFFICULTY SELECTION) --- */}
+      {phase === 'briefing' && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-xl overflow-y-auto">
+          <div className="apple-glass rounded-3xl p-6 md:p-8 max-w-3xl w-full border border-white/[0.12] shadow-2xl space-y-6 my-auto text-left">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-[#0071e3]/20 border border-[#2997ff]/30 px-2.5 py-0.5 text-[10px] font-semibold text-[#2997ff] uppercase tracking-wider">
+                    NASA Mission Window • Flight Briefing
+                  </span>
+                  <span className="text-[11px] font-mono text-[#86868b] flex items-center gap-1">
+                    <Clock size={12} /> 5:00 MIN FLIGHT
+                  </span>
+                </div>
+                <h2 className="mt-1.5 text-2xl md:text-3xl font-bold tracking-tight text-white apple-headline">
+                  Configure Deep Space Voyage
+                </h2>
+                <p className="text-xs text-[#86868b] mt-0.5">
+                  Select target destination, calibrate asteroid density parameters, and initiate light-speed launch.
+                </p>
+              </div>
 
-      {/* Top Header Bar */}
+              <button
+                type="button"
+                onClick={onExit}
+                className="apple-pill-btn flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.06] hover:bg-white/[0.12] px-3.5 py-1.5 text-xs text-[#86868b] hover:text-white transition"
+              >
+                <ArrowLeft size={13} /> Exit
+              </button>
+            </div>
+
+            {/* Section 1: Choose Target Planet */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold tracking-wider text-white uppercase flex items-center gap-1.5">
+                  <Compass size={14} className="text-[#2997ff]" /> 1. Select Target Planet / Destination
+                </p>
+                <span className="text-[11px] text-[#2997ff] font-mono">
+                  {selectedPlanet.name} • {selectedPlanet.distanceKm}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                {PLANETS.map((planet) => {
+                  const isSelected = selectedPlanet.id === planet.id
+                  return (
+                    <button
+                      key={planet.id}
+                      type="button"
+                      onClick={() => {
+                        audioTelemetry.playClick()
+                        setSelectedPlanet(planet)
+                      }}
+                      className={`group relative rounded-2xl p-4 text-left transition-all duration-200 border ${
+                        isSelected
+                          ? 'border-[#2997ff] bg-[#0071e3]/15 shadow-[0_0_24px_rgba(41,151,255,0.25)]'
+                          : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/[0.18]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div
+                          className="h-4 w-4 rounded-full shadow-md"
+                          style={{ backgroundColor: planet.color }}
+                        />
+                        <span className="text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded-full bg-white/10 text-white/80">
+                          {planet.tag}
+                        </span>
+                      </div>
+                      <p className="font-semibold text-sm text-white group-hover:text-[#2997ff] transition">
+                        {planet.name}
+                      </p>
+                      <p className="text-[10px] text-[#86868b] mt-0.5 font-mono">
+                        {planet.distanceKm}
+                      </p>
+                      <p className="text-[10px] text-[#86868b] mt-2 line-clamp-2 leading-relaxed">
+                        {planet.description}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Section 2: Choose Difficulty */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold tracking-wider text-white uppercase flex items-center gap-1.5">
+                <Target size={14} className="text-[#2997ff]" /> 2. Select Asteroid & Combat Difficulty
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {(Object.keys(DIFFICULTIES) as Difficulty[]).map((diffKey) => {
+                  const d = DIFFICULTIES[diffKey]
+                  const isSelected = selectedDifficulty === diffKey
+                  return (
+                    <button
+                      key={diffKey}
+                      type="button"
+                      onClick={() => {
+                        audioTelemetry.playClick()
+                        setSelectedDifficulty(diffKey)
+                      }}
+                      className={`rounded-2xl p-4 text-left transition-all duration-200 border ${
+                        isSelected
+                          ? 'border-[#2997ff] bg-[#0071e3]/15 shadow-[0_0_20px_rgba(41,151,255,0.25)]'
+                          : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/[0.18]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-sm text-white flex items-center gap-1.5">
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: d.colorBadge }}
+                          />
+                          {d.name}
+                        </span>
+                        <span className="text-[10px] font-mono text-[#86868b] uppercase">
+                          {d.label}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#86868b] leading-relaxed">
+                        {d.description}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Section 3: Mission Rules & Features Banner */}
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs text-[#86868b]">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-white font-medium">
+                  <Sparkles size={14} className="text-[#ff9f0a]" />
+                  <span>Mission Rules & Features:</span>
+                </div>
+                <p>
+                  • <strong>Duration</strong>: Exactly <strong>5:00 Minutes</strong> (Checkpoints at <strong>33%</strong> and <strong>66%</strong>).
+                </p>
+                <p>
+                  • <strong>Meteor Slingshot</strong>: Blasting an asteroid shoots a kinetic meteorite into alien ships for <strong>+750 PTS</strong>!
+                </p>
+                <p>
+                  • <strong>3 Lives</strong>: Collisions respawn at last checkpoint with a temporary energy shield.
+                </p>
+              </div>
+
+              <div className="text-right shrink-0 font-mono text-[11px] text-[#2997ff]">
+                Target: {selectedPlanet.name.toUpperCase()}
+                <br />
+                Vector: LIGHT SPEED (1.0c)
+              </div>
+            </div>
+
+            {/* Launch Button */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={startLaunchSequence}
+                className="apple-pill-btn flex-1 bg-gradient-to-r from-[#0071e3] to-[#af52de] hover:opacity-95 text-white py-3.5 text-sm font-semibold shadow-[0_4px_24px_rgba(0,113,227,0.5)] flex items-center justify-center gap-2 transition hover:scale-[1.01]"
+              >
+                <Rocket size={17} />
+                <span>Ignite Engines & Launch to {selectedPlanet.name}</span>
+              </button>
+              <button
+                type="button"
+                onClick={onExit}
+                className="apple-pill-btn border border-white/[0.12] bg-white/[0.06] hover:bg-white/[0.12] px-6 py-3.5 text-sm font-medium text-white"
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- PHASE 1: LAUNCHPAD COUNTDOWN --- */}
+      {phase === 'launching' && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 text-center bg-black/40 backdrop-blur-xs">
+          <div className="apple-glass rounded-3xl p-8 max-w-md w-full border border-white/[0.1] shadow-2xl space-y-6">
+            <div>
+              <span className="rounded-full border border-white/[0.12] bg-white/[0.06] px-3.5 py-1 text-xs text-[#2997ff] font-medium uppercase tracking-widest">
+                Cape Canaveral Launchpad 39A
+              </span>
+              <h2 className="mt-3 text-4xl font-bold tracking-tight apple-headline">
+                MISSION LAUNCH
+              </h2>
+              <p className="mt-2 text-xs text-[#86868b] leading-relaxed">
+                T-minus ignition. Deploying into 5-minute light-speed trajectory toward <strong>{selectedPlanet.name}</strong> ({diffConfig.name} difficulty).
+              </p>
+            </div>
+
+            <div className="text-6xl font-extrabold font-mono text-[#2997ff] tracking-tight">
+              {launchCountdown > 0 ? launchCountdown : 'IGNITION!'}
+            </div>
+
+            <button
+              type="button"
+              onClick={skipLaunch}
+              className="apple-pill-btn w-full bg-[#0071e3] hover:bg-[#0077ed] py-3 text-sm font-medium text-white shadow-[0_4px_20px_rgba(0,113,227,0.4)] flex items-center justify-center gap-2"
+            >
+              <FastForward size={16} /> Skip Launch to Light Speed
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- PHASE 2: PLAYING OVERLAY (PROGRESS & ON-SCREEN CONTROLS) --- */}
+      {phase === 'playing' && (
+        <>
+          {/* Distance & Planet Progress Bar (Top Center) */}
+          <div className="absolute top-20 inset-x-0 z-20 flex justify-center px-4">
+            <div className="w-full max-w-2xl rounded-2xl border border-white/[0.1] bg-[#161617]/85 p-3.5 backdrop-blur-2xl shadow-2xl">
+              <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
+                <span className="text-[#86868b] flex items-center gap-1.5">
+                  <Rocket size={13} className="text-[#2997ff]" /> Earth
+                </span>
+                <span className="font-mono text-[#2997ff] font-semibold flex items-center gap-2">
+                  <Clock size={13} className="text-[#ff9f0a]" />
+                  <span>{formatTime(remainingSeconds)} REMAINING</span>
+                  <span>•</span>
+                  <span>{Math.round(progressPercent)}%</span>
+                </span>
+                <span className="text-[#ff9f0a] flex items-center gap-1.5 font-semibold">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full inline-block"
+                    style={{ backgroundColor: selectedPlanet.color }}
+                  />
+                  {selectedPlanet.name}
+                </span>
+              </div>
+
+              {/* Progress bar with Checkpoint notches */}
+              <div className="relative h-2 rounded-full bg-white/[0.08] overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[#0071e3] via-[#2997ff] to-[#34c759] transition-all duration-100 ease-out"
+                  style={{ width: `${progressPercent}%` }}
+                />
+                {/* 33% Notch */}
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-white/40"
+                  style={{ left: '33.33%' }}
+                  title="Checkpoint Alpha (01:40)"
+                />
+                {/* 66% Notch */}
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-white/40"
+                  style={{ left: '66.66%' }}
+                  title="Checkpoint Bravo (03:20)"
+                />
+              </div>
+
+              <div className="flex justify-between text-[10px] text-[#86868b] mt-1 font-mono">
+                <span>00:00 (Launch)</span>
+                <span>01:40 (CP Alpha 33%)</span>
+                <span>03:20 (CP Bravo 66%)</span>
+                <span>05:00 ({selectedPlanet.name} Orbit)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Checkpoint & Combo Banners */}
+          {checkpointNotification && (
+            <div className="absolute top-36 inset-x-0 z-30 flex justify-center animate-bounce">
+              <div className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-5 py-2 backdrop-blur-xl text-xs font-semibold text-[#34c759] shadow-xl flex items-center gap-2">
+                <CheckCircle size={15} />
+                {checkpointNotification}
+              </div>
+            </div>
+          )}
+
+          {comboBanner && (
+            <div className="absolute top-48 inset-x-0 z-30 flex justify-center animate-pulse">
+              <div className="rounded-full border border-amber-400/50 bg-amber-500/25 px-5 py-1.5 backdrop-blur-xl text-xs font-bold text-[#ff9f0a] shadow-xl flex items-center gap-2">
+                <Flame size={15} />
+                {comboBanner}
+              </div>
+            </div>
+          )}
+
+          {/* Bottom On-Screen Arcade Controls (Touch & Keyboard Helper) */}
+          <div className="absolute bottom-6 inset-x-0 z-20 flex flex-col items-center gap-3 px-6 pointer-events-none">
+            <div className="pointer-events-auto flex items-center gap-4 bg-[#161617]/70 backdrop-blur-2xl p-2 rounded-full border border-white/[0.1] shadow-2xl">
+              <button
+                type="button"
+                onClick={moveLeft}
+                className="apple-pill-btn flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.08] hover:bg-white/[0.18] px-5 py-3 text-xs font-medium text-white active:scale-95 transition"
+              >
+                <ArrowLeft size={16} /> Steer Left (A / ←)
+              </button>
+
+              <button
+                type="button"
+                onClick={fireLaser}
+                className="apple-pill-btn flex items-center gap-2 rounded-full bg-gradient-to-r from-[#0071e3] to-[#2997ff] hover:opacity-90 px-7 py-3 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(0,113,227,0.4)] active:scale-95 transition"
+              >
+                <Flame size={16} /> Fire Lasers (Space)
+              </button>
+
+              <button
+                type="button"
+                onClick={moveRight}
+                className="apple-pill-btn flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.08] hover:bg-white/[0.18] px-5 py-3 text-xs font-medium text-white active:scale-95 transition"
+              >
+                Steer Right (D / →) <ArrowRight size={16} />
+              </button>
+            </div>
+
+            <p className="text-[11px] text-[#86868b] tracking-wide bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">
+              💡 Tip: Blast asteroids to slingshot burning meteorites into oncoming alien warships!
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* --- HUD HEADER BAR --- */}
       <header className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-5 md:px-8 bg-gradient-to-b from-black/80 to-transparent backdrop-blur-md">
         <div className="flex items-center gap-4">
           <button
@@ -636,10 +1397,10 @@ export default function SpaceRunnerGame({
           <div>
             <h1 className="font-semibold text-sm md:text-base tracking-tight apple-headline flex items-center gap-2">
               <Rocket size={16} className="text-[#2997ff]" />
-              DEEP SPACE ODYSSEY
+              DEEP SPACE ODYSSEY • {selectedPlanet.name.toUpperCase()}
             </h1>
             <p className="text-[10px] tracking-[0.2em] text-[#86868b] uppercase">
-              Light-Speed Planetary Intercept
+              {diffConfig.name} Difficulty • 5-Minute Planetary Intercept
             </p>
           </div>
         </div>
@@ -664,155 +1425,39 @@ export default function SpaceRunnerGame({
             </div>
 
             {/* Combat Score */}
-            <div className="rounded-full border border-white/[0.1] bg-[#161617]/80 px-4 py-1.5 backdrop-blur-xl font-mono text-sm text-[#2997ff]">
-              SCORE: <span className="text-white font-bold">{score}</span>
+            <div className="rounded-full border border-white/[0.1] bg-[#161617]/80 px-4 py-1.5 backdrop-blur-xl font-mono text-xs font-semibold text-[#2997ff]">
+              SCORE: {score}
             </div>
           </div>
         )}
       </header>
 
-      {/* Checkpoint Notification Banner */}
-      {checkpointNotification && (
-        <div className="absolute top-20 inset-x-0 z-30 flex justify-center">
-          <div className="mission-event-toast rounded-2xl border border-[#2997ff]/40 bg-[#161617]/95 px-6 py-3 text-center shadow-2xl backdrop-blur-2xl">
-            <p className="text-xs font-semibold tracking-wider text-[#2997ff] uppercase">
-              {checkpointNotification}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* --- PHASE 1: LAUNCHING SCREEN --- */}
-      {phase === 'launching' && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 text-center bg-black/40 backdrop-blur-xs">
-          <div className="apple-glass rounded-3xl p-8 max-w-md w-full border border-white/[0.1] shadow-2xl space-y-6">
-            <div>
-              <span className="rounded-full border border-white/[0.12] bg-white/[0.06] px-3.5 py-1 text-xs text-[#2997ff] font-medium uppercase tracking-widest">
-                Cape Canaveral Launchpad 39A
-              </span>
-              <h2 className="mt-3 text-4xl font-bold tracking-tight apple-headline">
-                MISSION LAUNCH
-              </h2>
-              <p className="mt-2 text-xs text-[#86868b] leading-relaxed">
-                T-minus ignition. Satellite is deploying into light-speed transit vector to target planetary destination.
-              </p>
-            </div>
-
-            <div className="text-6xl font-extrabold font-mono text-[#2997ff] tracking-tight">
-              {launchCountdown > 0 ? launchCountdown : 'IGNITION!'}
-            </div>
-
-            <button
-              type="button"
-              onClick={skipLaunch}
-              className="apple-pill-btn w-full bg-[#0071e3] hover:bg-[#0077ed] py-3 text-sm font-medium text-white shadow-[0_4px_20px_rgba(0,113,227,0.4)] flex items-center justify-center gap-2"
-            >
-              <FastForward size={16} /> Skip Launch to Light Speed
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* --- PHASE 2: PLAYING OVERLAY (PROGRESS & ON-SCREEN CONTROLS) --- */}
-      {phase === 'playing' && (
-        <>
-          {/* Distance & Planet Progress Bar (Top Center) */}
-          <div className="absolute top-20 inset-x-0 z-20 flex justify-center px-4">
-            <div className="w-full max-w-xl rounded-2xl border border-white/[0.1] bg-[#161617]/85 p-3.5 backdrop-blur-2xl shadow-2xl">
-              <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
-                <span className="text-[#86868b] flex items-center gap-1.5">
-                  <Rocket size={13} className="text-[#2997ff]" /> Earth Vector
-                </span>
-                <span className="font-mono text-[#2997ff] font-semibold">
-                  {Math.round(distance)}% • LIGHT SPEED (1.0c)
-                </span>
-                <span className="text-[#ff9f0a] flex items-center gap-1.5">
-                  Target Planet 🪐
-                </span>
-              </div>
-
-              {/* Progress bar with Checkpoint notches */}
-              <div className="relative h-2 rounded-full bg-white/[0.08] overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#2997ff] via-[#0071e3] to-[#ff9f0a] transition-all duration-150"
-                  style={{ width: `${distance}%` }}
-                />
-              </div>
-
-              <div className="flex justify-between text-[9px] text-[#86868b] mt-1.5 px-0.5">
-                <span>Launch</span>
-                <span>CP Alpha (33%)</span>
-                <span>CP Bravo (66%)</span>
-                <span>Target Orbit</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom On-Screen Controls for Laptop Trackpad / Touch / Keyboard */}
-          <footer className="absolute bottom-6 inset-x-0 z-20 flex flex-col items-center gap-3 px-6 pointer-events-auto">
-            <div className="text-[11px] text-[#86868b] flex items-center gap-4 bg-black/60 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/[0.08]">
-              <span>Controls: <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white font-mono">A / ←</kbd> Left</span>
-              <span><kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white font-mono">D / →</kbd> Right</span>
-              <span><kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white font-mono">Space</kbd> Fire Lasers</span>
-            </div>
-
-            {/* Mobile / Clickable Controller Buttons */}
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={moveLeft}
-                className="apple-pill-btn h-14 w-16 rounded-2xl border border-white/[0.12] bg-[#161617]/80 hover:bg-white/[0.15] active:scale-95 text-white shadow-xl backdrop-blur-2xl flex items-center justify-center"
-              >
-                <ArrowLeft size={22} />
-              </button>
-
-              <button
-                type="button"
-                onClick={fireLaser}
-                className="apple-pill-btn h-14 px-8 rounded-2xl bg-[#0071e3] hover:bg-[#0077ed] active:scale-95 text-white font-semibold text-sm shadow-[0_4px_20px_rgba(0,113,227,0.45)] flex items-center gap-2"
-              >
-                <Flame size={18} className="text-amber-300" />
-                FIRE LASERS
-              </button>
-
-              <button
-                type="button"
-                onClick={moveRight}
-                className="apple-pill-btn h-14 w-16 rounded-2xl border border-white/[0.12] bg-[#161617]/80 hover:bg-white/[0.15] active:scale-95 text-white shadow-xl backdrop-blur-2xl flex items-center justify-center"
-              >
-                <ArrowRight size={22} />
-              </button>
-            </div>
-          </footer>
-        </>
-      )}
-
-      {/* --- PHASE 3: GAMEOVER SCREEN --- */}
+      {/* --- PHASE 3: GAMEOVER SCREEN (AFTER 3 LIVES LOST) --- */}
       {phase === 'gameover' && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-black/85 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-8 max-w-md w-full border border-red-500/20 shadow-2xl text-center space-y-6">
+        <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+          <div className="apple-glass rounded-3xl p-8 max-w-md w-full border border-red-500/30 shadow-2xl text-center space-y-6">
             <div className="flex justify-center">
               <div className="p-4 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
-                <Shield size={36} />
+                <Shield size={40} />
               </div>
             </div>
 
             <div>
               <p className="text-xs font-semibold tracking-widest text-red-400 uppercase">
-                Vessel Destroyed • All Lives Depleted
+                Vessel Destroyed • All 3 Lives Depleted
               </p>
               <h2 className="mt-1 text-3xl font-bold apple-headline text-white">
                 GAME OVER
               </h2>
               <p className="mt-2 text-xs text-[#86868b]">
-                Spacecraft hull compromised in light-speed transit corridor.
+                Spacecraft hull compromised in light-speed transit vector to {selectedPlanet.name}.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 py-3 border-y border-white/[0.08] text-left">
               <div>
-                <p className="text-[10px] text-[#86868b] uppercase">Distance</p>
-                <p className="text-lg font-bold text-white font-mono">{Math.round(distance)}%</p>
+                <p className="text-[10px] text-[#86868b] uppercase">Flight Time</p>
+                <p className="text-lg font-bold text-white font-mono">{formatTime(elapsedSeconds)}</p>
               </div>
               <div>
                 <p className="text-[10px] text-[#86868b] uppercase">Score</p>
@@ -823,8 +1468,12 @@ export default function SpaceRunnerGame({
                 <p className="text-lg font-bold text-purple-400 font-mono">{aliensDestroyed}</p>
               </div>
               <div>
-                <p className="text-[10px] text-[#86868b] uppercase">Asteroids Shattered</p>
-                <p className="text-lg font-bold text-amber-400 font-mono">{asteroidsDestroyed}</p>
+                <p className="text-[10px] text-[#86868b] uppercase">Asteroids Smashed</p>
+                <p className="text-lg font-bold text-slate-300 font-mono">{asteroidsDestroyed}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-[10px] text-[#86868b] uppercase">Slingshot Combos</p>
+                <p className="text-lg font-bold text-amber-400 font-mono">{slingshotCombos}</p>
               </div>
             </div>
 
@@ -834,14 +1483,14 @@ export default function SpaceRunnerGame({
                 onClick={restartFromBeginning}
                 className="apple-pill-btn flex-1 bg-[#0071e3] hover:bg-[#0077ed] py-3 text-xs font-medium text-white shadow-[0_4px_16px_rgba(0,113,227,0.4)] flex items-center justify-center gap-2"
               >
-                <RotateCcw size={15} /> Retry from Launchpad
+                <RotateCcw size={15} /> Return to Flight Briefing
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- PHASE 4: VICTORY SCREEN --- */}
+      {/* --- PHASE 4: VICTORY SCREEN (5 MINUTES / 100% REACHED) --- */}
       {phase === 'victory' && (
         <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-8 max-w-lg w-full border border-emerald-500/30 shadow-2xl text-center space-y-6">
@@ -853,32 +1502,36 @@ export default function SpaceRunnerGame({
 
             <div>
               <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3.5 py-1 text-xs font-semibold text-[#34c759] uppercase tracking-wider">
-                Target Planetary Orbit Achieved
+                {selectedPlanet.name.toUpperCase()} ORBIT ACHIEVED • 5:00 FLIGHT COMPLETE
               </span>
               <h2 className="mt-2 text-4xl font-extrabold tracking-tight apple-headline text-white">
                 VICTORY! MISSION COMPLETE
               </h2>
               <p className="mt-2 text-xs text-[#86868b] leading-relaxed">
-                You successfully navigated through the asteroid belt, repelled hostile alien incursions at light speed, and established planetary orbit!
+                You survived the full 5-minute deep space transit on <strong>{diffConfig.name}</strong> mode, repelled hostile alien incursions, slingshotted meteorites, and safely entered {selectedPlanet.name} planetary orbit!
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 py-4 border-y border-white/[0.08] text-left">
               <div>
-                <p className="text-[10px] text-[#86868b] uppercase">Final Rank</p>
+                <p className="text-[10px] text-[#86868b] uppercase">Final Pilot Rank</p>
                 <p className="text-xl font-bold text-[#34c759] font-mono">ACE PILOT (A+)</p>
               </div>
               <div>
                 <p className="text-[10px] text-[#86868b] uppercase">Total Combat Score</p>
-                <p className="text-xl font-bold text-[#2997ff] font-mono">{score + 1000}</p>
+                <p className="text-xl font-bold text-[#2997ff] font-mono">{score + 1500}</p>
               </div>
               <div>
                 <p className="text-[10px] text-[#86868b] uppercase">Hostiles Destroyed</p>
                 <p className="text-base font-semibold text-white font-mono">{aliensDestroyed} Alien Ships</p>
               </div>
               <div>
-                <p className="text-[10px] text-[#86868b] uppercase">Obstacles Cleared</p>
-                <p className="text-base font-semibold text-white font-mono">{asteroidsDestroyed} Asteroids</p>
+                <p className="text-[10px] text-[#86868b] uppercase">Asteroids Smashed</p>
+                <p className="text-base font-semibold text-slate-300 font-mono">{asteroidsDestroyed}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-[10px] text-[#86868b] uppercase">Meteor Combos</p>
+                <p className="text-base font-semibold text-amber-400 font-mono">{slingshotCombos} Slingshots</p>
               </div>
             </div>
 
@@ -888,7 +1541,7 @@ export default function SpaceRunnerGame({
                 onClick={restartFromBeginning}
                 className="apple-pill-btn flex-1 bg-[#0071e3] hover:bg-[#0077ed] py-3 text-xs font-medium text-white shadow-[0_4px_16px_rgba(0,113,227,0.4)] flex items-center justify-center gap-2"
               >
-                <RotateCcw size={15} /> Play Again
+                <RotateCcw size={15} /> Fly Another Mission
               </button>
               <button
                 type="button"
