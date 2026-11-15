@@ -1,5 +1,6 @@
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import {
   BatteryCharging,
   Camera,
@@ -11,6 +12,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   RotateCcw,
+  ArrowRight,
 } from 'lucide-react'
 
 import {
@@ -20,83 +22,52 @@ import {
   storageSystems,
 } from '../../data/spacecraftOptions'
 
+import { calculateSpacecraftSpecifications } from '../../simulation/calculations'
+import {
+  MAX_BUDGET_CREDITS,
+  MAX_SPACECRAFT_MASS_KG,
+  validateSpacecraftConfiguration,
+} from '../../simulation/validator'
 import type { SpacecraftConfiguration } from '../../types/mission'
 
-const MAX_BUDGET = 1000
-const MAX_MASS = 25
-
-const initialConfiguration: SpacecraftConfiguration = {
+export const initialConfiguration: SpacecraftConfiguration = {
   powerSystemId: 'power-standard',
   instrumentIds: ['camera', 'radar'],
   communicationSystemId: 'antenna-standard',
   storageSystemId: 'storage-standard',
 }
 
-function SpacecraftDesigner() {
-  const [configuration, setConfiguration] =
-    useState<SpacecraftConfiguration>(initialConfiguration)
+interface SpacecraftDesignerProps {
+  configuration: SpacecraftConfiguration
+  setConfiguration: Dispatch<SetStateAction<SpacecraftConfiguration>>
+  onContinueToPlanner: () => void
+}
 
-  const specifications = useMemo(() => {
-    const power = powerSystems.find(
-      (item) => item.id === configuration.powerSystemId,
-    )!
-
-    const communication = communicationSystems.find(
-      (item) => item.id === configuration.communicationSystemId,
-    )!
-
-    const storage = storageSystems.find(
-      (item) => item.id === configuration.storageSystemId,
-    )!
-
-    const selectedInstruments = instruments.filter((item) =>
-      configuration.instrumentIds.includes(item.id),
-    )
-
-    const totalMass =
-      power.mass +
-      communication.mass +
-      storage.mass +
-      selectedInstruments.reduce((sum, item) => sum + item.mass, 0)
-
-    const totalCost =
-      power.cost +
-      communication.cost +
-      storage.cost +
-      selectedInstruments.reduce((sum, item) => sum + item.cost, 0)
-
-    const totalInstrumentPower = selectedInstruments.reduce(
-      (sum, item) => sum + item.powerConsumption,
-      0,
-    )
-
-    const totalScienceValue = selectedInstruments.reduce(
-      (sum, item) => sum + item.scienceValue,
-      0,
-    )
-
+function SpacecraftDesigner({
+  configuration,
+  setConfiguration,
+  onContinueToPlanner,
+}: SpacecraftDesignerProps) {
+  const { specifications, validation } = useMemo(() => {
     return {
-      totalMass,
-      totalCost,
-      batteryCapacity: power.batteryCapacity,
-      solarGeneration: power.solarGeneration,
-      totalInstrumentPower,
-      communicationRate: communication.dataRate,
-      storageCapacity: storage.capacity,
-      totalScienceValue,
-      selectedInstruments,
+      specifications: calculateSpacecraftSpecifications(configuration),
+      validation: validateSpacecraftConfiguration(configuration),
     }
   }, [configuration])
 
-  const budgetValid = specifications.totalCost <= MAX_BUDGET
-  const massValid = specifications.totalMass <= MAX_MASS
-  const designValid =
-    budgetValid &&
-    massValid &&
-    specifications.selectedInstruments.length > 0
+  const budgetValid = !validation.errors.some((error) =>
+    error.startsWith('Spacecraft cost ('),
+  )
+  const massValid = !validation.errors.some((error) =>
+    error.startsWith('Spacecraft mass ('),
+  )
+  const instrumentsValid = !validation.errors.some((error) =>
+    error.startsWith('Select at least one scientific instrument'),
+  )
+  const designValid = validation.valid
 
-  const remainingBudget = MAX_BUDGET - specifications.totalCost
-  const remainingMass = MAX_MASS - specifications.totalMass
+  const remainingBudget = MAX_BUDGET_CREDITS - specifications.totalCost
+  const remainingMass = MAX_SPACECRAFT_MASS_KG - specifications.totalMass
 
   const updateConfiguration = (
     key: keyof SpacecraftConfiguration,
@@ -158,6 +129,7 @@ function SpacecraftDesigner() {
     details: string[]
   }) => (
     <button
+      type="button"
       onClick={onClick}
       className={`w-full rounded-xl border p-4 text-left transition ${
         selected
@@ -204,13 +176,24 @@ function SpacecraftDesigner() {
           </p>
         </div>
 
-        <button
-          onClick={resetConfiguration}
-          className="flex items-center justify-center gap-2 rounded-lg border border-white/10 px-4 py-3 text-sm text-slate-300 hover:bg-white/5"
-        >
-          <RotateCcw size={16} />
-          Reset design
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={resetConfiguration}
+            className="flex items-center justify-center gap-2 rounded-lg border border-white/10 px-4 py-3 text-sm text-slate-300 hover:bg-white/5"
+          >
+            <RotateCcw size={16} />
+            Reset design
+          </button>
+          <button
+            type="button"
+            onClick={onContinueToPlanner}
+            className="flex items-center justify-center gap-2 rounded-lg bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300"
+          >
+            Mission Planner
+            <ArrowRight size={16} />
+          </button>
+        </div>
       </section>
 
       {/* Engineering constraints */}
@@ -241,7 +224,7 @@ function SpacecraftDesigner() {
               }`}
               style={{
                 width: `${Math.min(
-                  (specifications.totalCost / MAX_BUDGET) * 100,
+                  (specifications.totalCost / MAX_BUDGET_CREDITS) * 100,
                   100,
                 )}%`,
               }}
@@ -256,7 +239,7 @@ function SpacecraftDesigner() {
           </div>
           <div className="mt-3 flex items-end justify-between">
             <span className="text-2xl font-bold">
-              {specifications.totalMass} / 25 kg
+              {specifications.totalMass} / {MAX_SPACECRAFT_MASS_KG} kg
             </span>
             <span
               className={`text-xs ${
@@ -275,7 +258,7 @@ function SpacecraftDesigner() {
               }`}
               style={{
                 width: `${Math.min(
-                  (specifications.totalMass / MAX_MASS) * 100,
+                  (specifications.totalMass / MAX_SPACECRAFT_MASS_KG) * 100,
                   100,
                 )}%`,
               }}
@@ -351,7 +334,7 @@ function SpacecraftDesigner() {
           </section>
 
           {/* Communications */}
-          <section className="space-y-4">
+          <section id="communication-system" className="space-y-4">
             <div className="flex items-center gap-3">
               <RadioTower className="text-amber-400" size={22} />
               <div>
@@ -440,7 +423,7 @@ function SpacecraftDesigner() {
             ))}
           </div>
 
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-lg border border-white/10 bg-white/3 p-4">
             <div className="flex items-center gap-2">
               {designValid ? (
                 <ShieldCheck className="text-emerald-400" size={19} />
@@ -461,18 +444,28 @@ function SpacecraftDesigner() {
               </p>
               <p
                 className={
-                  specifications.selectedInstruments.length > 0
-                    ? 'text-emerald-400'
-                    : 'text-red-400'
+                  instrumentsValid ? 'text-emerald-400' : 'text-red-400'
                 }
               >
-                {specifications.selectedInstruments.length > 0 ? '✓' : '✕'} At
-                least one scientific instrument
+                {instrumentsValid ? '✓' : '✕'} At least one scientific
+                instrument
               </p>
             </div>
+
+            {validation.errors.length > 0 && (
+              <ul
+                role="alert"
+                className="mt-3 space-y-2 border-t border-white/10 pt-3 text-xs text-red-300"
+              >
+                {validation.errors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <button
+            type="button"
             onClick={saveConfiguration}
             disabled={!designValid}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-30"

@@ -17,8 +17,8 @@ export interface MissionResourcePlan {
   communicationWindowMinutes: number
 }
 
-const MAX_SPACECRAFT_MASS_KG = 25
-const MAX_BUDGET_CREDITS = 1000
+export const MAX_SPACECRAFT_MASS_KG = 25
+export const MAX_BUDGET_CREDITS = 1000
 
 function createValidationResult(errors: string[] = []): ValidationResult {
   return {
