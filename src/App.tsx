@@ -68,7 +68,19 @@ function App() {
     'configuration' | 'planner' | 'mission-control' | 'debrief'
   >('configuration')
   const [isMuted, setIsMuted] = useState(audioTelemetry.getMuted())
-  const [isRunnerModeActive, setIsRunnerModeActive] = useState(false)
+  const [isRunnerModeActive, setIsRunnerModeActive] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.has('game') || params.has('play') || params.has('runner') || params.has('odyssey')) {
+        return true
+      }
+      // On mobile phones or direct visits, open directly into the 3D Light-Speed Odyssey experience
+      if (window.innerWidth < 1024) {
+        return true
+      }
+    }
+    return false
+  })
   const isPlaybackRunningRef = useRef(false)
   const isAdvancingRef = useRef(false)
   const autoPauseOnTransitionsRef = useRef(true)
@@ -587,32 +599,32 @@ function App() {
         }
       >
         {screen !== 'mission-control' && screen !== 'debrief' && (
-          <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-white/[0.08] bg-[#000000]/70 backdrop-blur-2xl px-6 md:px-10">
+          <header className="sticky top-0 z-20 flex flex-wrap min-h-16 md:h-20 items-center justify-between border-b border-white/[0.08] bg-[#000000]/70 backdrop-blur-2xl px-4 md:px-10 py-2.5 gap-2">
             <div>
-              <p className="text-[11px] font-medium tracking-[0.2em] text-[#86868b] uppercase">
+              <p className="text-[10px] md:text-[11px] font-medium tracking-[0.2em] text-[#86868b] uppercase">
                 {screen === 'configuration'
-                  ? 'Mission / Orbital Environment'
-                  : 'Mission / Observation Planner'}
+                  ? 'Mission / Orbital Operations'
+                  : 'Mission / Planner'}
               </p>
-              <h2 className="mt-0.5 font-semibold text-lg text-white tracking-tight">
+              <h2 className="font-semibold text-base md:text-lg text-white tracking-tight">
                 {screen === 'configuration'
-                  ? 'Orbital Operations'
-                  : 'Manual Observation Planner'}
+                  ? 'Spacecraft Systems'
+                  : 'Observation Planner'}
               </h2>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => {
                   audioTelemetry.playClick()
                   setIsRunnerModeActive(true)
                 }}
-                className="apple-pill-btn flex items-center gap-2 rounded-full bg-gradient-to-r from-[#0071e3] to-[#af52de] hover:opacity-90 px-4 py-1.5 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(0,113,227,0.4)] transition-all hover:scale-[1.02]"
+                className="apple-pill-btn flex items-center gap-1.5 sm:gap-2 rounded-full bg-gradient-to-r from-[#0071e3] to-[#af52de] hover:opacity-90 px-3.5 sm:px-4 py-1.5 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(0,113,227,0.4)] transition-all hover:scale-[1.02]"
               >
-                <Rocket size={14} className="animate-pulse" />
+                <Rocket size={13} className="animate-pulse" />
                 <span>Play Light-Speed Odyssey</span>
                 <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-bold uppercase">
-                  3D Game
+                  3D
                 </span>
               </button>
               <button
@@ -623,18 +635,18 @@ function App() {
                   if (!next) audioTelemetry.playClick()
                 }}
                 title="Toggle NASA flight telemetry sound synthesizer"
-                className="apple-pill-btn flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.06] hover:bg-white/[0.12] px-3.5 py-1.5 text-xs text-[#f5f5f7] transition"
+                className="apple-pill-btn flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.06] hover:bg-white/[0.12] px-2.5 sm:px-3.5 py-1.5 text-xs text-[#f5f5f7] transition"
               >
                 {isMuted ? (
-                  <VolumeX size={14} className="text-[#86868b]" />
+                  <VolumeX size={13} className="text-[#86868b]" />
                 ) : (
-                  <Volume2 size={14} className="text-[#2997ff]" />
+                  <Volume2 size={13} className="text-[#2997ff]" />
                 )}
-                <span className="font-medium text-[11px]">
-                  {isMuted ? 'Muted' : 'NASA Audio'}
+                <span className="font-medium text-[11px] hidden sm:inline">
+                  {isMuted ? 'Muted' : 'Audio'}
                 </span>
               </button>
-              <span className="rounded-full border border-white/[0.12] bg-white/[0.06] backdrop-blur-md px-3.5 py-1.5 text-xs font-medium text-[#f5f5f7]">
+              <span className="hidden md:inline-flex rounded-full border border-white/[0.12] bg-white/[0.06] backdrop-blur-md px-3.5 py-1.5 text-xs font-medium text-[#f5f5f7]">
                 {screen === 'configuration' ? 'Visual Preview' : 'Manual Planning'}
               </span>
             </div>
