@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
+import { Stars, Sparkles } from '@react-three/drei'
 import {
   Heart,
   Rocket,
@@ -13,10 +14,13 @@ import {
   Clock,
   Compass,
   Target,
-  Sparkles,
+  Sparkles as SparklesIcon,
   CheckCircle,
   Smartphone,
   Crosshair,
+  Share2,
+  Copy,
+  ExternalLink,
 } from 'lucide-react'
 import { Group, Mesh, MathUtils, DoubleSide } from 'three'
 import { audioTelemetry } from '../../utils/audioTelemetry'
@@ -190,15 +194,26 @@ const DEFAULT_DURATION_SECONDS = 45 // 30s to 60s hackathon duration
 
 // --- 3D SCENE GRAPHICS COMPONENTS ---
 
-// 1. Futuristic 3-Lane Laser Highway Runway (Subway Surfers in Deep Space)
+// 1. Futuristic 3-Lane Holographic Vector Speedway (High-Tech Space Highway)
 function SpaceRunwayLanes({ currentLane }: { currentLane: number }) {
   const gridRef = useRef<Group>(null)
+  const pylonRef = useRef<Group>(null)
 
   useFrame((_, delta) => {
+    // Fast scrolling speed chevrons and grid lines
     if (gridRef.current) {
       gridRef.current.children.forEach((child) => {
-        child.position.z += 50 * delta
-        if (child.position.z > 15) {
+        child.position.z += 58 * delta
+        if (child.position.z > 16) {
+          child.position.z -= 120
+        }
+      })
+    }
+    // High-speed shoulder energy pylons for sensational parallax
+    if (pylonRef.current) {
+      pylonRef.current.children.forEach((child) => {
+        child.position.z += 58 * delta
+        if (child.position.z > 16) {
           child.position.z -= 120
         }
       })
@@ -207,54 +222,117 @@ function SpaceRunwayLanes({ currentLane }: { currentLane: number }) {
 
   return (
     <group position={[0, -1.05, 0]}>
-      {/* 4 Neon Guideway Rails */}
+      {/* 4 Glowing Cybernetic Vector Rails */}
       {[-4.8, -1.6, 1.6, 4.8].map((x, i) => (
-        <mesh key={i} position={[x, 0, -45]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.06, 120]} />
-          <meshBasicMaterial color="#0071e3" transparent opacity={0.35} />
-        </mesh>
+        <group key={i} position={[x, 0, -45]}>
+          {/* Main Neon Guideway Beam */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.08, 130]} />
+            <meshBasicMaterial color="#00f2fe" transparent opacity={0.65} />
+          </mesh>
+          {/* Outer Energy Halo */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+            <planeGeometry args={[0.26, 130]} />
+            <meshBasicMaterial color="#0071e3" transparent opacity={0.25} />
+          </mesh>
+        </group>
       ))}
 
-      {/* Active Glowing Lane under player ship */}
-      <mesh
-        position={[LANES[currentLane + 1] || 0, 0.01, -12]}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <planeGeometry args={[2.8, 32]} />
-        <meshBasicMaterial color="#2997ff" transparent opacity={0.15} />
+      {/* Cyber Grid Speed Floor */}
+      <mesh position={[0, -0.04, -45]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[9.6, 130]} />
+        <meshStandardMaterial
+          color="#060913"
+          roughness={0.2}
+          metalness={0.9}
+        />
       </mesh>
 
-      {/* Fast scrolling speed chevrons */}
+      {/* Dynamic Active Lane Glowing Under-Vector */}
+      <mesh
+        position={[LANES[currentLane + 1] || 0, 0.015, -14]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <planeGeometry args={[2.9, 36]} />
+        <meshBasicMaterial color="#00f2fe" transparent opacity={0.18} />
+      </mesh>
+
+      {/* Rushing Vector Chevrons along lanes */}
       <group ref={gridRef}>
-        {Array.from({ length: 12 }).map((_, i) => (
-          <mesh key={i} position={[0, 0.02, -i * 10]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[9.6, 0.14]} />
-            <meshBasicMaterial color="#2997ff" transparent opacity={0.22} />
-          </mesh>
+        {Array.from({ length: 14 }).map((_, i) => (
+          <group key={i} position={[0, 0.02, -i * 9]}>
+            {/* Center chevron marker */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[8.8, 0.16]} />
+              <meshBasicMaterial color="#38bdf8" transparent opacity={0.35} />
+            </mesh>
+            {/* Lane Center Arrows */}
+            {LANES.map((lx, li) => (
+              <mesh key={li} position={[lx, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[0.9, 0.5]} />
+                <meshBasicMaterial color="#2997ff" transparent opacity={0.25} />
+              </mesh>
+            ))}
+          </group>
+        ))}
+      </group>
+
+      {/* High-Tech Shoulder Energy Pylons (Parallax speed markers) */}
+      <group ref={pylonRef}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <group key={i} position={[0, 0, -i * 15]}>
+            {/* Left Energy Pylon */}
+            <mesh position={[-5.4, 0.6, 0]}>
+              <boxGeometry args={[0.12, 1.2, 0.12]} />
+              <meshStandardMaterial color="#00f2fe" emissive="#0071e3" emissiveIntensity={1.8} />
+            </mesh>
+            <mesh position={[-5.4, 1.25, 0]}>
+              <sphereGeometry args={[0.14, 8, 8]} />
+              <meshBasicMaterial color="#38bdf8" />
+            </mesh>
+            {/* Right Energy Pylon */}
+            <mesh position={[5.4, 0.6, 0]}>
+              <boxGeometry args={[0.12, 1.2, 0.12]} />
+              <meshStandardMaterial color="#00f2fe" emissive="#0071e3" emissiveIntensity={1.8} />
+            </mesh>
+            <mesh position={[5.4, 1.25, 0]}>
+              <sphereGeometry args={[0.14, 8, 8]} />
+              <meshBasicMaterial color="#38bdf8" />
+            </mesh>
+          </group>
         ))}
       </group>
     </group>
   )
 }
 
-// 2. Volumetric Deep-Space Nebula Clouds
+// 2. Volumetric Deep-Space Nebula Clouds & Cosmic Starfield
 function CosmicNebula() {
   return (
     <group position={[0, 0, -110]}>
-      {/* Violet Deep Space Nebula */}
-      <mesh position={[-28, 14, -10]}>
-        <sphereGeometry args={[22, 16, 16]} />
-        <meshBasicMaterial color="#581c87" transparent opacity={0.12} />
+      {/* Drei Dense Deep Space Stars */}
+      <Stars radius={140} depth={70} count={7500} factor={4} saturation={0.8} fade speed={1.8} />
+
+      {/* Floating Cosmic Dust Particles */}
+      <Sparkles count={140} scale={[30, 20, 70]} size={4} speed={0.9} opacity={0.7} color="#38bdf8" />
+      <Sparkles count={70} scale={[24, 16, 50]} size={5} speed={1.3} opacity={0.6} color="#fbbf24" />
+
+      {/* 4-Tier Volumetric Nebula Dust Clouds */}
+      <mesh position={[-32, 16, -15]}>
+        <sphereGeometry args={[26, 16, 16]} />
+        <meshBasicMaterial color="#4c1d95" transparent opacity={0.16} />
       </mesh>
-      {/* Cyan Hyperdrive Cloud */}
-      <mesh position={[30, -12, -25]}>
-        <sphereGeometry args={[25, 16, 16]} />
-        <meshBasicMaterial color="#0369a1" transparent opacity={0.14} />
+      <mesh position={[34, -14, -25]}>
+        <sphereGeometry args={[28, 16, 16]} />
+        <meshBasicMaterial color="#0369a1" transparent opacity={0.18} />
       </mesh>
-      {/* Golden Stellar Corona */}
-      <mesh position={[0, 26, -40]}>
-        <sphereGeometry args={[30, 16, 16]} />
-        <meshBasicMaterial color="#7c2d12" transparent opacity={0.09} />
+      <mesh position={[-15, -20, -35]}>
+        <sphereGeometry args={[24, 16, 16]} />
+        <meshBasicMaterial color="#831843" transparent opacity={0.14} />
+      </mesh>
+      <mesh position={[0, 32, -45]}>
+        <sphereGeometry args={[34, 16, 16]} />
+        <meshBasicMaterial color="#78350f" transparent opacity={0.12} />
       </mesh>
     </group>
   )
@@ -263,6 +341,7 @@ function CosmicNebula() {
 // 3. Holographic Targeting Crosshair in Active Lane
 function TargetingReticle({ lane }: { lane: number }) {
   const meshRef = useRef<Group>(null)
+  const innerRef = useRef<Group>(null)
   const targetX = LANES[lane + 1] || 0
   const currentX = useRef(targetX)
 
@@ -270,21 +349,32 @@ function TargetingReticle({ lane }: { lane: number }) {
     if (meshRef.current) {
       currentX.current = MathUtils.damp(currentX.current, targetX, 14, delta)
       meshRef.current.position.x = currentX.current
-      meshRef.current.rotation.z += 1.8 * delta
+      meshRef.current.rotation.z += 1.6 * delta
+    }
+    if (innerRef.current) {
+      innerRef.current.rotation.z -= 2.4 * delta
     }
   })
 
   return (
-    <group ref={meshRef} position={[targetX, -0.15, -12]}>
+    <group ref={meshRef} position={[targetX, -0.15, -13]}>
+      {/* Outer Tactical Ring */}
       <mesh>
-        <ringGeometry args={[0.42, 0.48, 24]} />
-        <meshBasicMaterial color="#38bdf8" transparent opacity={0.35} />
+        <ringGeometry args={[0.5, 0.56, 32]} />
+        <meshBasicMaterial color="#00f2fe" transparent opacity={0.5} />
       </mesh>
-      {/* Corner crosshairs */}
-      {[-0.6, 0.6].map((x, i) => (
+      {/* Inner Counter-Rotating Bracket */}
+      <group ref={innerRef}>
+        <mesh>
+          <ringGeometry args={[0.3, 0.35, 4]} />
+          <meshBasicMaterial color="#38bdf8" transparent opacity={0.7} />
+        </mesh>
+      </group>
+      {/* Cardinal Ticks */}
+      {[-0.7, 0.7].map((x, i) => (
         <mesh key={i} position={[x, 0, 0]}>
-          <boxGeometry args={[0.12, 0.02, 0.02]} />
-          <meshBasicMaterial color="#38bdf8" transparent opacity={0.55} />
+          <boxGeometry args={[0.16, 0.02, 0.02]} />
+          <meshBasicMaterial color="#00f2fe" transparent opacity={0.75} />
         </mesh>
       ))}
     </group>
@@ -299,7 +389,7 @@ function ShockwaveMesh({ shockwave }: { shockwave: Shockwave }) {
     if (ringRef.current) {
       const age = (Date.now() - shockwave.createdAt) / 450
       if (age <= 1) {
-        const s = 0.5 + age * 3.2
+        const s = 0.5 + age * 3.6
         ringRef.current.scale.set(s, s, 1)
         const mat = ringRef.current.material as any
         if (mat) mat.opacity = Math.max(0, 1 - age)
@@ -308,19 +398,21 @@ function ShockwaveMesh({ shockwave }: { shockwave: Shockwave }) {
   })
 
   return (
-    <mesh ref={ringRef} position={[shockwave.x, shockwave.y, shockwave.z]}>
-      <ringGeometry args={[0.4, 0.85, 24]} />
-      <meshBasicMaterial
-        color={shockwave.color}
-        transparent
-        opacity={1}
-        side={DoubleSide}
-      />
-    </mesh>
+    <group position={[shockwave.x, shockwave.y, shockwave.z]}>
+      <mesh ref={ringRef}>
+        <ringGeometry args={[0.4, 0.95, 32]} />
+        <meshBasicMaterial
+          color={shockwave.color}
+          transparent
+          opacity={1}
+          side={DoubleSide}
+        />
+      </mesh>
+    </group>
   )
 }
 
-// 5. Player's AAA Aerospace Spacecraft with Muzzle Flash, Thrusters & Shield
+// 5. Player's AAA Stealth Interceptor Starfighter (Aerospace Studio Quality)
 function PlayerShip({
   targetLane,
   isRolling,
@@ -335,132 +427,212 @@ function PlayerShip({
   const groupRef = useRef<Group>(null)
   const thrustersRef = useRef<Group>(null)
   const shieldRef = useRef<Mesh>(null)
+  const recoilRef = useRef(0)
   const currentX = useRef(LANES[targetLane + 1] || 0)
   const targetX = LANES[targetLane + 1] || 0
 
   useFrame((_, delta) => {
     if (!groupRef.current) return
-    currentX.current = MathUtils.damp(currentX.current, targetX, 14, delta)
+    currentX.current = MathUtils.damp(currentX.current, targetX, 15, delta)
     groupRef.current.position.x = currentX.current
 
-    // Bank / roll ship when changing lanes with smooth inertia
-    const targetRoll = (targetX - currentX.current) * -0.22 + isRolling * 0.05
+    // Realistic banking roll when changing lanes
+    const targetRoll = (targetX - currentX.current) * -0.28 + isRolling * 0.06
     groupRef.current.rotation.z = MathUtils.damp(
       groupRef.current.rotation.z,
       targetRoll,
       12,
       delta,
     )
-    groupRef.current.rotation.x = Math.sin(Date.now() * 0.005) * 0.04
 
-    // Dynamic thruster plasma flame pulsation
+    // Weapon firing recoil kickback along Z axis
+    if (isFiring) {
+      recoilRef.current = 0.12
+    }
+    recoilRef.current = MathUtils.damp(recoilRef.current, 0, 18, delta)
+    groupRef.current.position.z = recoilRef.current
+
+    // Micro aerodynamic flight oscillation
+    groupRef.current.rotation.x = Math.sin(Date.now() * 0.005) * 0.035
+    groupRef.current.position.y = -0.4 + Math.sin(Date.now() * 0.006) * 0.04
+
+    // Dynamic triple-stage plasma flame pulsation
     if (thrustersRef.current) {
-      const pulse = 1 + Math.sin(Date.now() * 0.035) * 0.2 + Math.random() * 0.12
+      const pulse = 1 + Math.sin(Date.now() * 0.04) * 0.25 + Math.random() * 0.15
       thrustersRef.current.scale.set(1, 1, pulse)
     }
 
     // Shield rotation
     if (shieldRef.current && isShielded) {
-      shieldRef.current.rotation.y += 1.8 * delta
-      shieldRef.current.rotation.x += 1.2 * delta
+      shieldRef.current.rotation.y += 2.0 * delta
+      shieldRef.current.rotation.x += 1.4 * delta
     }
   })
 
   return (
     <group ref={groupRef} position={[0, -0.4, 0]}>
-      {/* Sleek Aerodynamic Fuselage (Titanium / Matte Carbon) */}
-      <mesh position={[0, 0, -0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.5, 2.4, 6]} />
-        <meshStandardMaterial color="#f0f2f5" metalness={0.9} roughness={0.15} />
-      </mesh>
-
-      {/* Main Cockpit Canopy (Sapphire crystal with blue HUD glow) */}
-      <mesh position={[0, 0.23, -0.1]}>
-        <sphereGeometry args={[0.26, 16, 16]} />
+      {/* 1. Main Stealth Fuselage Body (Titanium Carbon Composite) */}
+      <mesh position={[0, 0, -0.15]} rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.55, 2.6, 7]} />
         <meshStandardMaterial
-          color="#2997ff"
-          emissive="#0071e3"
-          emissiveIntensity={0.8}
-          metalness={0.9}
-          roughness={0.1}
+          color="#e2e8f0"
+          metalness={0.94}
+          roughness={0.12}
         />
       </mesh>
 
-      {/* Swept Stealth Delta Wings */}
-      <mesh position={[0, -0.06, 0.45]}>
-        <boxGeometry args={[2.5, 0.06, 1.0]} />
-        <meshStandardMaterial color="#1c1c1e" metalness={0.85} roughness={0.25} />
+      {/* Chisel Stealth Nose Probe */}
+      <mesh position={[0, 0, -1.5]} rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.18, 0.7, 5]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.95} roughness={0.1} />
       </mesh>
 
-      {/* Wingtip Navigation Lights */}
-      {/* Left Wingtip: Port Red */}
-      <mesh position={[-1.25, -0.04, 0.5]}>
-        <sphereGeometry args={[0.06, 8, 8]} />
-        <meshStandardMaterial color="#ff453a" emissive="#ff453a" emissiveIntensity={2.5} />
-      </mesh>
-      {/* Right Wingtip: Starboard Green */}
-      <mesh position={[1.25, -0.04, 0.5]}>
-        <sphereGeometry args={[0.06, 8, 8]} />
-        <meshStandardMaterial color="#30d158" emissive="#30d158" emissiveIntensity={2.5} />
-      </mesh>
-
-      {/* Heavy Dual Laser Cannon Pods */}
-      <mesh position={[-1.05, -0.03, 0.15]}>
-        <cylinderGeometry args={[0.05, 0.06, 0.9, 10]} />
-        <meshStandardMaterial color="#2997ff" metalness={0.95} roughness={0.1} />
-      </mesh>
-      <mesh position={[1.05, -0.03, 0.15]}>
-        <cylinderGeometry args={[0.05, 0.06, 0.9, 10]} />
-        <meshStandardMaterial color="#2997ff" metalness={0.95} roughness={0.1} />
+      {/* 2. Crystalline Sapphire Cockpit Canopy */}
+      <mesh position={[0, 0.25, -0.1]}>
+        <sphereGeometry args={[0.28, 20, 20]} />
+        <meshStandardMaterial
+          color="#38bdf8"
+          emissive="#0071e3"
+          emissiveIntensity={1.2}
+          metalness={0.95}
+          roughness={0.05}
+          transparent
+          opacity={0.88}
+        />
       </mesh>
 
-      {/* Muzzle Flash Flares when firing lasers */}
+      {/* Interior Cockpit Holo-HUD glow */}
+      <mesh position={[0, 0.28, -0.22]} rotation={[Math.PI / 6, 0, 0]}>
+        <planeGeometry args={[0.18, 0.08]} />
+        <meshBasicMaterial color="#00f2fe" transparent opacity={0.9} />
+      </mesh>
+
+      {/* 3. Swept Delta Stealth Wings */}
+      <mesh position={[0, -0.06, 0.42]}>
+        <boxGeometry args={[2.7, 0.07, 1.1]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.9} roughness={0.2} />
+      </mesh>
+
+      {/* Luminous Wing Leading Edge Plasma Conduits */}
+      <mesh position={[-0.8, -0.04, 0.15]} rotation={[0, 0.4, 0]}>
+        <boxGeometry args={[1.1, 0.03, 0.04]} />
+        <meshBasicMaterial color="#00f2fe" />
+      </mesh>
+      <mesh position={[0.8, -0.04, 0.15]} rotation={[0, -0.4, 0]}>
+        <boxGeometry args={[1.1, 0.03, 0.04]} />
+        <meshBasicMaterial color="#00f2fe" />
+      </mesh>
+
+      {/* Twin Angled Stealth Tail Fins */}
+      <mesh position={[-0.65, 0.38, 0.75]} rotation={[0, 0, -0.25]}>
+        <boxGeometry args={[0.06, 0.65, 0.55]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.9} roughness={0.2} />
+      </mesh>
+      <mesh position={[0.65, 0.38, 0.75]} rotation={[0, 0, 0.25]}>
+        <boxGeometry args={[0.06, 0.65, 0.55]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.9} roughness={0.2} />
+      </mesh>
+
+      {/* Wingtip Navigation LED Strobes */}
+      {/* Port Red Beacon */}
+      <mesh position={[-1.35, -0.04, 0.55]}>
+        <sphereGeometry args={[0.07, 10, 10]} />
+        <meshStandardMaterial color="#ff3b30" emissive="#ff3b30" emissiveIntensity={3.5} />
+      </mesh>
+      {/* Starboard Green Beacon */}
+      <mesh position={[1.35, -0.04, 0.55]}>
+        <sphereGeometry args={[0.07, 10, 10]} />
+        <meshStandardMaterial color="#34c759" emissive="#34c759" emissiveIntensity={3.5} />
+      </mesh>
+
+      {/* 4. Heavy Dual Railgun Laser Cannons */}
+      <mesh position={[-1.15, -0.03, 0.18]}>
+        <cylinderGeometry args={[0.06, 0.07, 1.0, 12]} />
+        <meshStandardMaterial color="#38bdf8" metalness={0.95} roughness={0.08} />
+      </mesh>
+      <mesh position={[1.15, -0.03, 0.18]}>
+        <cylinderGeometry args={[0.06, 0.07, 1.0, 12]} />
+        <meshStandardMaterial color="#38bdf8" metalness={0.95} roughness={0.08} />
+      </mesh>
+
+      {/* Muzzle Flash Shockwave Flares when firing */}
       {isFiring && (
         <>
-          <mesh position={[-1.05, -0.03, -0.4]}>
-            <sphereGeometry args={[0.16, 8, 8]} />
+          <mesh position={[-1.15, -0.03, -0.45]}>
+            <sphereGeometry args={[0.22, 10, 10]} />
             <meshBasicMaterial color="#ffffff" />
           </mesh>
-          <mesh position={[1.05, -0.03, -0.4]}>
-            <sphereGeometry args={[0.16, 8, 8]} />
+          <mesh position={[1.15, -0.03, -0.45]}>
+            <sphereGeometry args={[0.22, 10, 10]} />
             <meshBasicMaterial color="#ffffff" />
           </mesh>
-          <pointLight position={[0, 0, -0.5]} intensity={2.8} distance={5} color="#38bdf8" />
+          <pointLight position={[0, 0, -0.6]} intensity={3.5} distance={7} color="#00f2fe" />
         </>
       )}
 
-      {/* Twin Plasma Thruster Engines */}
-      <mesh position={[-0.32, -0.06, 1.1]}>
-        <cylinderGeometry args={[0.13, 0.18, 0.38, 14]} />
-        <meshStandardMaterial color="#0071e3" emissive="#0071e3" emissiveIntensity={1.0} />
+      {/* 5. Twin Vector Thruster Combustion Chambers */}
+      <mesh position={[-0.35, -0.05, 1.15]}>
+        <cylinderGeometry args={[0.15, 0.2, 0.42, 16]} />
+        <meshStandardMaterial color="#0071e3" emissive="#0071e3" emissiveIntensity={1.5} />
       </mesh>
-      <mesh position={[0.32, -0.06, 1.1]}>
-        <cylinderGeometry args={[0.13, 0.18, 0.38, 14]} />
-        <meshStandardMaterial color="#0071e3" emissive="#0071e3" emissiveIntensity={1.0} />
+      <mesh position={[0.35, -0.05, 1.15]}>
+        <cylinderGeometry args={[0.15, 0.2, 0.42, 16]} />
+        <meshStandardMaterial color="#0071e3" emissive="#0071e3" emissiveIntensity={1.5} />
       </mesh>
 
-      {/* Animated Ion Flame Cones */}
+      {/* Triple-Stage Plasma Afterburner Plumes */}
       <group ref={thrustersRef}>
-        <mesh position={[-0.32, -0.06, 1.6]} rotation={[Math.PI / 2, 0, 0]}>
-          <coneGeometry args={[0.14, 0.75, 12]} />
-          <meshBasicMaterial color="#38bdf8" />
+        {/* Inner White-Hot Core Flame */}
+        <mesh position={[-0.35, -0.05, 1.65]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.1, 0.9, 12]} />
+          <meshBasicMaterial color="#ffffff" />
         </mesh>
-        <mesh position={[0.32, -0.06, 1.6]} rotation={[Math.PI / 2, 0, 0]}>
-          <coneGeometry args={[0.14, 0.75, 12]} />
-          <meshBasicMaterial color="#38bdf8" />
+        <mesh position={[0.35, -0.05, 1.65]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.1, 0.9, 12]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+
+        {/* Middle Electric Cyan Plasma Cone */}
+        <mesh position={[-0.35, -0.05, 1.85]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.16, 1.25, 14]} />
+          <meshBasicMaterial color="#00f2fe" transparent opacity={0.85} />
+        </mesh>
+        <mesh position={[0.35, -0.05, 1.85]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.16, 1.25, 14]} />
+          <meshBasicMaterial color="#00f2fe" transparent opacity={0.85} />
+        </mesh>
+
+        {/* Outer Violet Magnetohydrodynamic Aura */}
+        <mesh position={[-0.35, -0.05, 2.05]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.22, 1.6, 14]} />
+          <meshBasicMaterial color="#a855f7" transparent opacity={0.4} />
+        </mesh>
+        <mesh position={[0.35, -0.05, 2.05]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.22, 1.6, 14]} />
+          <meshBasicMaterial color="#a855f7" transparent opacity={0.4} />
         </mesh>
       </group>
 
-      {/* Invulnerability Energy Shield Sphere */}
+      {/* Wingtip Light-Speed Contrail Streamers */}
+      <mesh position={[-1.35, -0.04, 1.6]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.04, 2.2]} />
+        <meshBasicMaterial color="#00f2fe" transparent opacity={0.4} />
+      </mesh>
+      <mesh position={[1.35, -0.04, 1.6]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.04, 2.2]} />
+        <meshBasicMaterial color="#00f2fe" transparent opacity={0.4} />
+      </mesh>
+
+      {/* 6. Holographic Geodesic Energy Shield */}
       {isShielded && (
         <mesh ref={shieldRef} position={[0, 0, 0]}>
-          <sphereGeometry args={[1.7, 18, 18]} />
+          <sphereGeometry args={[1.85, 20, 20]} />
           <meshStandardMaterial
             color="#38bdf8"
             emissive="#0284c7"
-            emissiveIntensity={1.2}
+            emissiveIntensity={1.5}
             transparent
-            opacity={0.35}
+            opacity={0.4}
             wireframe
           />
         </mesh>
@@ -471,13 +643,14 @@ function PlayerShip({
 
 // 6. Hyperdrive Streaking Warp Stars
 function WarpSpeedStars({ isWarping }: { isWarping: boolean }) {
-  const count = 380
+  const count = 420
   const stars = useMemo(() => {
     return Array.from({ length: count }, () => ({
-      x: (Math.random() - 0.5) * 38,
-      y: (Math.random() - 0.5) * 24,
+      x: (Math.random() - 0.5) * 42,
+      y: (Math.random() - 0.5) * 26,
       z: -Math.random() * 120,
-      length: Math.random() * 3 + 1.8,
+      length: Math.random() * 3.5 + 2.0,
+      color: Math.random() > 0.4 ? '#38bdf8' : Math.random() > 0.5 ? '#ffffff' : '#fbbf24',
     }))
   }, [])
 
@@ -485,10 +658,10 @@ function WarpSpeedStars({ isWarping }: { isWarping: boolean }) {
 
   useFrame((_, delta) => {
     if (!starsRef.current) return
-    const speed = isWarping ? 80 : 14
+    const speed = isWarping ? 88 : 16
     starsRef.current.children.forEach((child) => {
       child.position.z += speed * delta
-      if (child.position.z > 15) {
+      if (child.position.z > 16) {
         child.position.z = -115
       }
     })
@@ -498,100 +671,144 @@ function WarpSpeedStars({ isWarping }: { isWarping: boolean }) {
     <group ref={starsRef}>
       {stars.map((star, i) => (
         <mesh key={i} position={[star.x, star.y, star.z]}>
-          <boxGeometry args={[0.06, 0.06, isWarping ? star.length * 2.8 : 0.35]} />
-          <meshBasicMaterial color={i % 3 === 0 ? '#38bdf8' : i % 5 === 0 ? '#ff7a45' : '#ffffff'} />
+          <boxGeometry args={[0.065, 0.065, isWarping ? star.length * 3.2 : 0.4]} />
+          <meshBasicMaterial color={star.color} />
         </mesh>
       ))}
     </group>
   )
 }
 
-// 7. Rugged 3D Asteroid Rock with Molten Magma Cracks
+// 7. Rugged 3D Tumbling Asteroid Rock with Molten Magma Cracks & Orbiting Shards
 function AsteroidMesh({ obstacle }: { obstacle: Obstacle }) {
-  const meshRef = useRef<Mesh>(null)
+  const meshRef = useRef<Group>(null)
+  const debrisRef = useRef<Group>(null)
 
   useFrame((_, delta) => {
     if (meshRef.current) {
       meshRef.current.rotation.x += obstacle.rotationSpeed * delta
-      meshRef.current.rotation.y += obstacle.rotationSpeed * 0.8 * delta
+      meshRef.current.rotation.y += obstacle.rotationSpeed * 0.85 * delta
+      meshRef.current.rotation.z += obstacle.rotationSpeed * 0.45 * delta
+    }
+    if (debrisRef.current) {
+      debrisRef.current.rotation.y += 2.2 * delta
     }
   })
 
   const isDamaged = obstacle.health < obstacle.maxHealth
 
   return (
-    <mesh ref={meshRef} position={[LANES[obstacle.lane + 1], 0, obstacle.z]}>
-      <dodecahedronGeometry args={[0.82, 1]} />
-      <meshStandardMaterial
-        color={isDamaged ? '#ef4444' : '#64748b'}
-        emissive={isDamaged ? '#b91c1c' : '#000000'}
-        emissiveIntensity={isDamaged ? 0.6 : 0}
-        roughness={0.92}
-        metalness={0.25}
-      />
-    </mesh>
+    <group ref={meshRef} position={[LANES[obstacle.lane + 1], 0, obstacle.z]}>
+      {/* Main Asteroid Core Body */}
+      <mesh>
+        <dodecahedronGeometry args={[0.88, 1]} />
+        <meshStandardMaterial
+          color={isDamaged ? '#ef4444' : '#475569'}
+          emissive={isDamaged ? '#b91c1c' : '#ea580c'}
+          emissiveIntensity={isDamaged ? 1.0 : 0.3}
+          roughness={0.88}
+          metalness={0.3}
+        />
+      </mesh>
+
+      {/* Incandescent Magma Fissure Veins */}
+      <mesh scale={[1.02, 1.02, 1.02]}>
+        <icosahedronGeometry args={[0.85, 0]} />
+        <meshBasicMaterial
+          color={isDamaged ? '#ff0033' : '#f97316'}
+          wireframe
+          transparent
+          opacity={isDamaged ? 0.8 : 0.45}
+        />
+      </mesh>
+
+      {/* Orbiting Satellite Rock Debris Shards */}
+      <group ref={debrisRef}>
+        {[
+          [-1.15, 0.4, 0.2],
+          [1.2, -0.35, -0.3],
+          [0.1, 1.1, -0.4],
+        ].map(([dx, dy, dz], i) => (
+          <mesh key={i} position={[dx, dy, dz]}>
+            <dodecahedronGeometry args={[0.16, 0]} />
+            <meshStandardMaterial color="#64748b" roughness={0.9} />
+          </mesh>
+        ))}
+      </group>
+    </group>
   )
 }
 
-// 8. Bio-Mechanical 3D Alien War Cruiser with Pulsing Reactor Core
+// 8. Sinister Bio-Mechanical 3D Alien War Cruiser (Predator Menace)
 function AlienFighterMesh({ obstacle }: { obstacle: Obstacle }) {
   const groupRef = useRef<Group>(null)
   const coreRef = useRef<Mesh>(null)
 
   useFrame(() => {
     if (groupRef.current) {
-      groupRef.current.rotation.z = Math.sin(Date.now() * 0.008) * 0.25
+      groupRef.current.rotation.z = Math.sin(Date.now() * 0.008) * 0.28
+      groupRef.current.position.y = Math.sin(Date.now() * 0.007) * 0.12
     }
     if (coreRef.current) {
-      const pulse = 1 + Math.sin(Date.now() * 0.012) * 0.25
+      const pulse = 1 + Math.sin(Date.now() * 0.014) * 0.32
       coreRef.current.scale.set(pulse, pulse, pulse)
     }
   })
 
   return (
     <group ref={groupRef} position={[LANES[obstacle.lane + 1], 0, obstacle.z]}>
-      {/* Obsidian Bio-Mechanical Hull */}
+      {/* Obsidian Bio-Mechanical Stealth Hull */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.95, 0.45, 0.24, 6]} />
+        <cylinderGeometry args={[1.05, 0.48, 0.28, 6]} />
         <meshStandardMaterial
-          color="#1e1035"
-          emissive="#581c87"
-          emissiveIntensity={0.5}
-          metalness={0.85}
-          roughness={0.2}
+          color="#150a24"
+          emissive="#7e22ce"
+          emissiveIntensity={0.65}
+          metalness={0.92}
+          roughness={0.18}
         />
       </mesh>
 
-      {/* Forward Attack Mandibles */}
-      <mesh position={[-0.45, 0, -0.6]} rotation={[-Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.15, 0.8, 4]} />
-        <meshStandardMaterial color="#0f051d" metalness={0.9} />
+      {/* Forward Predator Attack Mandibles with Plasma Blades */}
+      <mesh position={[-0.52, 0, -0.7]} rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.18, 0.95, 4]} />
+        <meshStandardMaterial color="#090314" metalness={0.95} roughness={0.1} />
       </mesh>
-      <mesh position={[0.45, 0, -0.6]} rotation={[-Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.15, 0.8, 4]} />
-        <meshStandardMaterial color="#0f051d" metalness={0.9} />
+      <mesh position={[0.52, 0, -0.7]} rotation={[-Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.18, 0.95, 4]} />
+        <meshStandardMaterial color="#090314" metalness={0.95} roughness={0.1} />
       </mesh>
 
-      {/* Pulsing Biomechanical Plasma Eye Core */}
-      <mesh ref={coreRef} position={[0, 0.16, -0.1]}>
-        <sphereGeometry args={[0.3, 16, 16]} />
+      {/* Pulsing Bio-Singularity Core Eye */}
+      <mesh ref={coreRef} position={[0, 0.18, -0.15]}>
+        <sphereGeometry args={[0.34, 18, 18]} />
         <meshStandardMaterial
           color="#ff0055"
           emissive="#ff0055"
-          emissiveIntensity={2.2}
+          emissiveIntensity={2.8}
         />
       </mesh>
 
-      {/* Rear Plasma Exhaust Cones */}
-      <mesh position={[0, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.18, 0.12, 0.35, 8]} />
-        <meshStandardMaterial color="#a855f7" emissive="#a855f7" emissiveIntensity={1.5} />
+      {/* Menacing Red Laser Targeting Lock-On Ray */}
+      <mesh position={[0, 0, -5]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.04, 10]} />
+        <meshBasicMaterial color="#ff0055" transparent opacity={0.4} />
       </mesh>
 
-      {/* Health Pip indicator for heavy cruisers */}
+      {/* Rear Anti-Matter Drive Exhausts */}
+      <mesh position={[-0.32, 0, 0.55]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.14, 0.1, 0.4, 8]} />
+        <meshStandardMaterial color="#a855f7" emissive="#a855f7" emissiveIntensity={2.0} />
+      </mesh>
+      <mesh position={[0.32, 0, 0.55]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.14, 0.1, 0.4, 8]} />
+        <meshStandardMaterial color="#a855f7" emissive="#a855f7" emissiveIntensity={2.0} />
+      </mesh>
+
+      {/* Dreadnought Armor Pip Bars */}
       {obstacle.maxHealth > 1 && (
-        <mesh position={[0, 0.65, 0]}>
-          <boxGeometry args={[obstacle.health * 0.35, 0.06, 0.06]} />
+        <mesh position={[0, 0.72, 0]}>
+          <boxGeometry args={[obstacle.health * 0.4, 0.08, 0.08]} />
           <meshBasicMaterial color="#ff0055" />
         </mesh>
       )}
@@ -599,45 +816,61 @@ function AlienFighterMesh({ obstacle }: { obstacle: Obstacle }) {
   )
 }
 
-// 9. High-Energy Laser Bolts
+// 9. Hyper-Velocity Dual Plasma Laser Bolts
 function LaserBoltMesh({ bolt }: { bolt: LaserBolt }) {
   return (
     <group position={[bolt.x, -0.4, bolt.z]}>
-      {/* Left Laser */}
-      <mesh position={[-1.05, 0, 0]}>
-        <boxGeometry args={[0.08, 0.08, 1.6]} />
-        <meshBasicMaterial color="#38bdf8" />
+      {/* Left Laser: Outer Cyan Envelope & Inner White Core */}
+      <mesh position={[-1.15, 0, 0]}>
+        <boxGeometry args={[0.12, 0.12, 2.0]} />
+        <meshBasicMaterial color="#00f2fe" />
       </mesh>
+      <mesh position={[-1.15, 0, 0]}>
+        <boxGeometry args={[0.05, 0.05, 1.8]} />
+        <meshBasicMaterial color="#ffffff" />
+      </mesh>
+
       {/* Right Laser */}
-      <mesh position={[1.05, 0, 0]}>
-        <boxGeometry args={[0.08, 0.08, 1.6]} />
-        <meshBasicMaterial color="#38bdf8" />
+      <mesh position={[1.15, 0, 0]}>
+        <boxGeometry args={[0.12, 0.12, 2.0]} />
+        <meshBasicMaterial color="#00f2fe" />
+      </mesh>
+      <mesh position={[1.15, 0, 0]}>
+        <boxGeometry args={[0.05, 0.05, 1.8]} />
+        <meshBasicMaterial color="#ffffff" />
       </mesh>
     </group>
   )
 }
 
-// 10. Slingshot Kinetic Meteor Shard
+// 10. Slingshot Kinetic Meteor Projectile
 function MeteorShardMesh({ shard }: { shard: MeteorShard }) {
   const meshRef = useRef<Mesh>(null)
 
   useFrame((_, delta) => {
     if (meshRef.current) {
-      meshRef.current.rotation.x += 12 * delta
-      meshRef.current.rotation.y += 15 * delta
+      meshRef.current.rotation.x += 14 * delta
+      meshRef.current.rotation.y += 18 * delta
     }
   })
 
   return (
-    <mesh ref={meshRef} position={[LANES[shard.lane + 1], 0, shard.z]}>
-      <dodecahedronGeometry args={[0.48, 0]} />
-      <meshStandardMaterial
-        color="#ff7a00"
-        emissive="#ff3b30"
-        emissiveIntensity={1.8}
-        roughness={0.4}
-      />
-    </mesh>
+    <group position={[LANES[shard.lane + 1], 0, shard.z]}>
+      <mesh ref={meshRef}>
+        <dodecahedronGeometry args={[0.54, 1]} />
+        <meshStandardMaterial
+          color="#ff7a00"
+          emissive="#ff3b30"
+          emissiveIntensity={2.5}
+          roughness={0.3}
+        />
+      </mesh>
+      {/* Flaming Outer Fireball Halo */}
+      <mesh scale={[1.25, 1.25, 1.25]}>
+        <sphereGeometry args={[0.54, 14, 14]} />
+        <meshBasicMaterial color="#fbbf24" transparent opacity={0.45} />
+      </mesh>
+    </group>
   )
 }
 
@@ -650,43 +883,50 @@ function DestinationPlanet({
   planet: PlanetOption
 }) {
   const zPos = -120 + progress * 0.95
-  const s = 3.6 + progress * 0.08
+  const s = 3.8 + progress * 0.08
+  const planetRef = useRef<Group>(null)
+
+  useFrame((_, delta) => {
+    if (planetRef.current) {
+      planetRef.current.rotation.y += 0.2 * delta
+    }
+  })
 
   return (
-    <group position={[0, 0, zPos]} scale={[s, s, s]}>
+    <group ref={planetRef} position={[0, 0, zPos]} scale={[s, s, s]}>
       {/* Main Planetary Sphere */}
       <mesh>
-        <sphereGeometry args={[1, 32, 32]} />
+        <sphereGeometry args={[1, 36, 36]} />
         <meshStandardMaterial
           color={planet.color}
-          roughness={0.7}
+          roughness={0.65}
           metalness={0.15}
           emissive={planet.emissive}
-          emissiveIntensity={0.3}
+          emissiveIntensity={0.35}
         />
       </mesh>
 
       {/* Atmospheric Corona */}
-      <mesh scale={[1.09, 1.09, 1.09]}>
-        <sphereGeometry args={[1, 24, 24]} />
+      <mesh scale={[1.1, 1.1, 1.1]}>
+        <sphereGeometry args={[1, 26, 26]} />
         <meshStandardMaterial
           color={planet.glowColor}
           transparent
-          opacity={0.3}
+          opacity={0.35}
           emissive={planet.glowColor}
-          emissiveIntensity={0.6}
+          emissiveIntensity={0.8}
         />
       </mesh>
 
       {/* Saturnian Rings (if Titan/Saturn selected) */}
       {planet.hasRings && (
         <mesh rotation={[Math.PI / 3, 0.25, 0]}>
-          <ringGeometry args={[1.35, 2.45, 48]} />
+          <ringGeometry args={[1.35, 2.5, 48]} />
           <meshStandardMaterial
             color={planet.ringColor || '#d1b280'}
             side={DoubleSide}
             transparent
-            opacity={0.7}
+            opacity={0.75}
           />
         </mesh>
       )}
@@ -694,29 +934,35 @@ function DestinationPlanet({
   )
 }
 
-// 12. Cape Canaveral Launchpad Rocket
+// 12. Cape Canaveral Launchpad Heavy Rocket
 function LaunchRocket({ altitude }: { altitude: number }) {
   return (
     <group position={[0, altitude - 2.5, -4]}>
-      {/* Rocket Body */}
-      <mesh position={[0, 1.5, 0]}>
-        <cylinderGeometry args={[0.35, 0.45, 4.5, 16]} />
-        <meshStandardMaterial color="#ffffff" metalness={0.4} roughness={0.3} />
+      {/* Rocket Fuselage */}
+      <mesh position={[0, 1.6, 0]}>
+        <cylinderGeometry args={[0.38, 0.46, 4.8, 18]} />
+        <meshStandardMaterial color="#f8fafc" metalness={0.4} roughness={0.25} />
       </mesh>
 
-      {/* Nosecone */}
-      <mesh position={[0, 4.2, 0]}>
-        <coneGeometry args={[0.35, 1.2, 16]} />
+      {/* NASA Blue Accent Band */}
+      <mesh position={[0, 3.2, 0]}>
+        <cylinderGeometry args={[0.4, 0.4, 0.35, 18]} />
         <meshStandardMaterial color="#0071e3" metalness={0.5} roughness={0.2} />
       </mesh>
 
-      {/* Rocket Flame Particle Glow */}
-      <mesh position={[0, -1.2, 0]}>
-        <coneGeometry args={[0.45, 2.2, 12]} />
+      {/* Aerodynamic Nosecone */}
+      <mesh position={[0, 4.4, 0]}>
+        <coneGeometry args={[0.38, 1.3, 18]} />
+        <meshStandardMaterial color="#0071e3" metalness={0.5} roughness={0.2} />
+      </mesh>
+
+      {/* Volumetric Rocket Flame Plume */}
+      <mesh position={[0, -1.3, 0]}>
+        <coneGeometry args={[0.5, 2.6, 14]} />
         <meshBasicMaterial color="#ff9f0a" />
       </mesh>
-      <mesh position={[0, -1.8, 0]}>
-        <coneGeometry args={[0.25, 1.5, 12]} />
+      <mesh position={[0, -1.9, 0]}>
+        <coneGeometry args={[0.28, 1.8, 14]} />
         <meshBasicMaterial color="#ffffff" />
       </mesh>
     </group>
@@ -760,6 +1006,17 @@ export default function SpaceRunnerGame({
   const [isFiring, setIsFiring] = useState(false)
   const [checkpointNotification, setCheckpointNotification] = useState<string | null>(null)
   const [comboBanner, setComboBanner] = useState<string | null>(null)
+  const [copiedPublicLink, setCopiedPublicLink] = useState(false)
+  const publicLiveUrl = 'https://shaw-relevant-bulk-prot.trycloudflare.com'
+
+  const handleCopyPublicUrl = () => {
+    audioTelemetry.playClick()
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(publicLiveUrl)
+    }
+    setCopiedPublicLink(true)
+    setTimeout(() => setCopiedPublicLink(false), 2500)
+  }
 
   // Entities
   const [lasers, setLasers] = useState<LaserBolt[]>([])
@@ -1176,15 +1433,24 @@ export default function SpaceRunnerGame({
         <div className="pointer-events-none absolute inset-0 z-50 bg-red-600/35 transition-opacity" />
       )}
 
-      {/* 3D Canvas with Elevated Camera for Clear Vanishing Horizon */}
+      {/* 3D Canvas with High-Performance Anti-Aliasing and Studio Space Lighting */}
       <Canvas
         camera={{ position: [0, 2.8, 5.8], fov: 62 }}
         className="absolute inset-0 z-0"
+        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
-        <ambientLight intensity={0.5} color="#0c1d36" />
-        <directionalLight position={[12, 22, 16]} intensity={1.8} color="#ffffff" />
-        <pointLight position={[0, -0.4, 2.0]} intensity={1.5} color="#38bdf8" />
-        <pointLight position={[0, 0, -40]} intensity={1.2} color={selectedPlanet.glowColor} />
+        <color attach="background" args={['#020409']} />
+        <ambientLight intensity={0.4} color="#0c1d36" />
+        {/* Primary Stellar Sunlight with Specular Hull Highlights */}
+        <directionalLight position={[14, 24, 18]} intensity={2.5} color="#ffffff" />
+        {/* Dynamic Vector Runway Uplight */}
+        <pointLight position={[0, -0.8, 1.5]} intensity={2.2} distance={8} color="#00f2fe" />
+        {/* Planetary Approach Corona Glow */}
+        <pointLight position={[0, 2, -60]} intensity={2.0} distance={100} color={selectedPlanet.glowColor} />
+        {/* Critical Hull Breach Emergency Alarm Strobe */}
+        {lives === 1 && (
+          <pointLight position={[0, 1.5, 0]} intensity={3.5} distance={15} color="#ff0033" />
+        )}
 
         {phase === 'launching' ? (
           <>
@@ -1276,6 +1542,50 @@ export default function SpaceRunnerGame({
               >
                 <ArrowLeft size={13} /> Exit
               </button>
+            </div>
+
+            {/* Public Live Launch Banner (Any Device Globally Can Play) */}
+            <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/30 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs backdrop-blur-xl">
+              <div className="flex items-center gap-2.5 text-white">
+                <div className="h-3 w-3 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                <div>
+                  <div className="flex items-center gap-1.5 font-semibold text-cyan-300">
+                    <Share2 size={13} />
+                    <span>Public Live URL (Play on Mobile or Share with Judges):</span>
+                  </div>
+                  <div className="font-mono text-white/90 text-[11px] mt-0.5 select-all break-all">
+                    {publicLiveUrl}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleCopyPublicUrl}
+                  className="apple-pill-btn flex-1 sm:flex-none bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 px-3.5 py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-95"
+                >
+                  {copiedPublicLink ? (
+                    <>
+                      <CheckCircle size={13} className="text-emerald-400" />
+                      <span className="text-emerald-300">Link Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={13} />
+                      <span>Copy Link</span>
+                    </>
+                  )}
+                </button>
+                <a
+                  href={publicLiveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="apple-pill-btn bg-white/10 hover:bg-white/20 border border-white/20 text-white px-2.5 py-1.5 text-xs flex items-center justify-center"
+                  title="Open live website in new tab"
+                >
+                  <ExternalLink size={13} />
+                </a>
+              </div>
             </div>
 
             {/* Section 1: Choose Target Planet */}
@@ -1416,7 +1726,7 @@ export default function SpaceRunnerGame({
             {/* Section 4: Mobile & Desktop Controls Banner */}
             <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3.5 text-xs text-[#86868b] space-y-1">
               <div className="flex items-center gap-2 text-white font-medium">
-                <Sparkles size={13} className="text-[#ff9f0a]" />
+                <SparklesIcon size={13} className="text-[#ff9f0a]" />
                 <span>Controls & Mobile Tips:</span>
               </div>
               <p>
