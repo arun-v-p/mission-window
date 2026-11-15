@@ -12,3 +12,36 @@ body {
   background: #080d18;
   color: #f1f5f9;
 }
+
+.mission-viewport::after {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  content: "";
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 35%, rgb(2 6 17 / 35%) 100%),
+    linear-gradient(90deg, rgb(2 6 17 / 16%), transparent 25%, transparent 75%, rgb(2 6 17 / 16%));
+}
+
+.mission-event-toast {
+  animation: mission-event-arrive 420ms ease-out both;
+}
+
+@keyframes mission-event-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mission-event-toast {
+    animation: none;
+  }
+}
