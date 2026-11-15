@@ -15,6 +15,8 @@ import {
   Target,
   Sparkles,
   CheckCircle,
+  Smartphone,
+  Crosshair,
 } from 'lucide-react'
 import { Group, Mesh, MathUtils, DoubleSide } from 'three'
 import { audioTelemetry } from '../../utils/audioTelemetry'
@@ -163,6 +165,15 @@ interface MeteorShard {
   z: number
 }
 
+interface Shockwave {
+  id: number
+  x: number
+  y: number
+  z: number
+  color: string
+  createdAt: number
+}
+
 interface Obstacle {
   id: number
   type: 'asteroid' | 'alien'
@@ -210,7 +221,7 @@ function SpaceRunwayLanes({ currentLane }: { currentLane: number }) {
         rotation={[-Math.PI / 2, 0, 0]}
       >
         <planeGeometry args={[2.8, 32]} />
-        <meshBasicMaterial color="#2997ff" transparent opacity={0.12} />
+        <meshBasicMaterial color="#2997ff" transparent opacity={0.15} />
       </mesh>
 
       {/* Fast scrolling speed chevrons */}
@@ -249,15 +260,77 @@ function CosmicNebula() {
   )
 }
 
-// 3. Player's AAA Aerospace Spacecraft with Animated Thruster Plumes & Shield
+// 3. Holographic Targeting Crosshair in Active Lane
+function TargetingReticle({ lane }: { lane: number }) {
+  const meshRef = useRef<Group>(null)
+  const targetX = LANES[lane + 1] || 0
+  const currentX = useRef(targetX)
+
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      currentX.current = MathUtils.damp(currentX.current, targetX, 14, delta)
+      meshRef.current.position.x = currentX.current
+      meshRef.current.rotation.z += 1.8 * delta
+    }
+  })
+
+  return (
+    <group ref={meshRef} position={[targetX, -0.15, -12]}>
+      <mesh>
+        <ringGeometry args={[0.42, 0.48, 24]} />
+        <meshBasicMaterial color="#38bdf8" transparent opacity={0.35} />
+      </mesh>
+      {/* Corner crosshairs */}
+      {[-0.6, 0.6].map((x, i) => (
+        <mesh key={i} position={[x, 0, 0]}>
+          <boxGeometry args={[0.12, 0.02, 0.02]} />
+          <meshBasicMaterial color="#38bdf8" transparent opacity={0.55} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+// 4. Expanding 3D Explosion Shockwave Ring
+function ShockwaveMesh({ shockwave }: { shockwave: Shockwave }) {
+  const ringRef = useRef<Mesh>(null)
+
+  useFrame(() => {
+    if (ringRef.current) {
+      const age = (Date.now() - shockwave.createdAt) / 450
+      if (age <= 1) {
+        const s = 0.5 + age * 3.2
+        ringRef.current.scale.set(s, s, 1)
+        const mat = ringRef.current.material as any
+        if (mat) mat.opacity = Math.max(0, 1 - age)
+      }
+    }
+  })
+
+  return (
+    <mesh ref={ringRef} position={[shockwave.x, shockwave.y, shockwave.z]}>
+      <ringGeometry args={[0.4, 0.85, 24]} />
+      <meshBasicMaterial
+        color={shockwave.color}
+        transparent
+        opacity={1}
+        side={DoubleSide}
+      />
+    </mesh>
+  )
+}
+
+// 5. Player's AAA Aerospace Spacecraft with Muzzle Flash, Thrusters & Shield
 function PlayerShip({
   targetLane,
   isRolling,
   isShielded,
+  isFiring,
 }: {
   targetLane: number
   isRolling: number
   isShielded: boolean
+  isFiring: boolean
 }) {
   const groupRef = useRef<Group>(null)
   const thrustersRef = useRef<Group>(null)
@@ -341,6 +414,21 @@ function PlayerShip({
         <meshStandardMaterial color="#2997ff" metalness={0.95} roughness={0.1} />
       </mesh>
 
+      {/* Muzzle Flash Flares when firing lasers */}
+      {isFiring && (
+        <>
+          <mesh position={[-1.05, -0.03, -0.4]}>
+            <sphereGeometry args={[0.16, 8, 8]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
+          <mesh position={[1.05, -0.03, -0.4]}>
+            <sphereGeometry args={[0.16, 8, 8]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
+          <pointLight position={[0, 0, -0.5]} intensity={2.8} distance={5} color="#38bdf8" />
+        </>
+      )}
+
       {/* Twin Plasma Thruster Engines */}
       <mesh position={[-0.32, -0.06, 1.1]}>
         <cylinderGeometry args={[0.13, 0.18, 0.38, 14]} />
@@ -381,7 +469,7 @@ function PlayerShip({
   )
 }
 
-// 4. Hyperdrive Streaking Warp Stars
+// 6. Hyperdrive Streaking Warp Stars
 function WarpSpeedStars({ isWarping }: { isWarping: boolean }) {
   const count = 380
   const stars = useMemo(() => {
@@ -418,7 +506,7 @@ function WarpSpeedStars({ isWarping }: { isWarping: boolean }) {
   )
 }
 
-// 5. Rugged 3D Asteroid Rock with Molten Magma Cracks
+// 7. Rugged 3D Asteroid Rock with Molten Magma Cracks
 function AsteroidMesh({ obstacle }: { obstacle: Obstacle }) {
   const meshRef = useRef<Mesh>(null)
 
@@ -445,7 +533,7 @@ function AsteroidMesh({ obstacle }: { obstacle: Obstacle }) {
   )
 }
 
-// 6. Bio-Mechanical 3D Alien War Cruiser with Pulsing Reactor Core
+// 8. Bio-Mechanical 3D Alien War Cruiser with Pulsing Reactor Core
 function AlienFighterMesh({ obstacle }: { obstacle: Obstacle }) {
   const groupRef = useRef<Group>(null)
   const coreRef = useRef<Mesh>(null)
@@ -511,7 +599,7 @@ function AlienFighterMesh({ obstacle }: { obstacle: Obstacle }) {
   )
 }
 
-// 7. High-Energy Laser Bolts
+// 9. High-Energy Laser Bolts
 function LaserBoltMesh({ bolt }: { bolt: LaserBolt }) {
   return (
     <group position={[bolt.x, -0.4, bolt.z]}>
@@ -529,7 +617,7 @@ function LaserBoltMesh({ bolt }: { bolt: LaserBolt }) {
   )
 }
 
-// 8. Slingshot Kinetic Meteor Shard
+// 10. Slingshot Kinetic Meteor Shard
 function MeteorShardMesh({ shard }: { shard: MeteorShard }) {
   const meshRef = useRef<Mesh>(null)
 
@@ -553,7 +641,7 @@ function MeteorShardMesh({ shard }: { shard: MeteorShard }) {
   )
 }
 
-// 9. Destination Target Planet with Dynamic Corona & Saturnian Rings
+// 11. Destination Target Planet with Dynamic Corona & Saturnian Rings
 function DestinationPlanet({
   progress,
   planet,
@@ -606,7 +694,7 @@ function DestinationPlanet({
   )
 }
 
-// 10. Cape Canaveral Launchpad Rocket
+// 12. Cape Canaveral Launchpad Rocket
 function LaunchRocket({ altitude }: { altitude: number }) {
   return (
     <group position={[0, altitude - 2.5, -4]}>
@@ -669,18 +757,24 @@ export default function SpaceRunnerGame({
   const [slingshotCombos, setSlingshotCombos] = useState(0)
   const [flashDamage, setFlashDamage] = useState(false)
   const [isShielded, setIsShielded] = useState(false)
+  const [isFiring, setIsFiring] = useState(false)
   const [checkpointNotification, setCheckpointNotification] = useState<string | null>(null)
   const [comboBanner, setComboBanner] = useState<string | null>(null)
 
   // Entities
   const [lasers, setLasers] = useState<LaserBolt[]>([])
   const [meteorShards, setMeteorShards] = useState<MeteorShard[]>([])
+  const [shockwaves, setShockwaves] = useState<Shockwave[]>([])
   const [obstacles, setObstacles] = useState<Obstacle[]>([])
 
   const nextId = useRef(1)
   const lastSpawn = useRef(0)
   const rolling = useRef(0)
   const invulnerableUntil = useRef(0)
+
+  // Touch Swipe Gesture Tracking for Mobile
+  const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
 
   const diffConfig = DIFFICULTIES[selectedDifficulty]
   const progressPercent = Math.min(100, (elapsedSeconds / selectedDuration) * 100)
@@ -755,16 +849,49 @@ export default function SpaceRunnerGame({
     })
   }, [])
 
-  // 3. Laser Gun Shooting
+  // 3. Laser Gun Shooting with Muzzle Flash
   const fireLaser = useCallback(() => {
     if (phase !== 'playing') return
     audioTelemetry.playLaserShot()
+    setIsFiring(true)
+    setTimeout(() => setIsFiring(false), 90)
+
     const boltX = LANES[targetLane + 1]
     setLasers((prev) => [
       ...prev,
       { id: nextId.current++, x: boltX, z: -1.2 },
     ])
   }, [phase, targetLane])
+
+  // Mobile Touch Gestures (Swiping anywhere left/right moves lane, tapping fires lasers)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (phase !== 'playing') return
+    const touch = e.touches[0]
+    touchStartX.current = touch.clientX
+    touchStartY.current = touch.clientY
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (phase !== 'playing' || touchStartX.current === null) return
+    const touch = e.changedTouches[0]
+    const deltaX = touch.clientX - touchStartX.current
+    const deltaY = touch.clientY - (touchStartY.current || 0)
+
+    // Horizontal swipe threshold: 35px
+    if (Math.abs(deltaX) > 35 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX < 0) {
+        moveLeft()
+      } else {
+        moveRight()
+      }
+    } else if (Math.abs(deltaX) < 18 && Math.abs(deltaY) < 18) {
+      // Tap on open screen to fire lasers!
+      fireLaser()
+    }
+
+    touchStartX.current = null
+    touchStartY.current = null
+  }
 
   // Keyboard Event Listeners (A / D, Left / Right, Spacebar)
   useEffect(() => {
@@ -784,7 +911,7 @@ export default function SpaceRunnerGame({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [phase, moveLeft, moveRight, fireLaser])
 
-  // 4. Game Loop: Movement, Spawning, Collisions, 5-Minute Flight Timer
+  // 4. Game Loop: Movement, Spawning, Collisions, 30s-60s Flight Timer
   useEffect(() => {
     if (phase !== 'playing') return
 
@@ -824,6 +951,9 @@ export default function SpaceRunnerGame({
 
       // Update Shield state
       setIsShielded(Date.now() < invulnerableUntil.current)
+
+      // Clean up finished explosion shockwaves
+      setShockwaves((prev) => prev.filter((s) => Date.now() - s.createdAt < 500))
 
       // Spawn Obstacles according to difficulty configuration
       const now = Date.now()
@@ -876,6 +1006,20 @@ export default function SpaceRunnerGame({
             if (hittingShardIndex !== -1) {
               // Obliterated by slingshot meteor!
               audioTelemetry.playExplosion()
+
+              // Spawn 3D Shockwave
+              setShockwaves((shocks) => [
+                ...shocks,
+                {
+                  id: nextId.current++,
+                  x: LANES[obs.lane + 1],
+                  y: 0,
+                  z: obs.z,
+                  color: '#a855f7',
+                  createdAt: Date.now(),
+                },
+              ])
+
               setAliensDestroyed((c) => c + 1)
               setSlingshotCombos((c) => c + 1)
               setScore((s) => s + 750)
@@ -916,6 +1060,19 @@ export default function SpaceRunnerGame({
               if (obstacle.health <= 0) {
                 destroyedByLaser = true
                 audioTelemetry.playExplosion()
+
+                // Spawn 3D Explosion Shockwave
+                setShockwaves((shocks) => [
+                  ...shocks,
+                  {
+                    id: nextId.current++,
+                    x: LANES[obstacle.lane + 1],
+                    y: 0,
+                    z: obstacle.z,
+                    color: obstacle.type === 'alien' ? '#a855f7' : '#ff7a00',
+                    createdAt: Date.now(),
+                  },
+                ])
 
                 if (obstacle.type === 'alien') {
                   setAliensDestroyed((c) => c + 1)
@@ -1002,13 +1159,18 @@ export default function SpaceRunnerGame({
     setObstacles([])
     setLasers([])
     setMeteorShards([])
+    setShockwaves([])
     setLaunchCountdown(3)
     setLaunchAltitude(0)
     setPhase('briefing')
   }
 
   return (
-    <div className="fixed inset-0 z-[100] h-screen w-screen bg-[#000000] overflow-hidden select-none font-sans text-white">
+    <div
+      className="fixed inset-0 z-[100] h-screen w-screen bg-[#000000] overflow-hidden select-none font-sans text-white touch-none"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Red screen flash when taking damage */}
       {flashDamage && (
         <div className="pointer-events-none absolute inset-0 z-50 bg-red-600/35 transition-opacity" />
@@ -1040,11 +1202,15 @@ export default function SpaceRunnerGame({
             {/* 3D Holographic Speed Highway Runway */}
             <SpaceRunwayLanes currentLane={targetLane} />
 
+            {/* Holographic Targeting Reticle */}
+            <TargetingReticle lane={targetLane} />
+
             {/* Player's Jet Spacecraft */}
             <PlayerShip
               targetLane={targetLane}
               isRolling={rolling.current}
               isShielded={isShielded}
+              isFiring={isFiring}
             />
 
             {/* Lasers */}
@@ -1055,6 +1221,11 @@ export default function SpaceRunnerGame({
             {/* Kinetic Slingshot Meteor Shards */}
             {meteorShards.map((shard) => (
               <MeteorShardMesh key={shard.id} shard={shard} />
+            ))}
+
+            {/* 3D Explosion Shockwaves */}
+            {shockwaves.map((shock) => (
+              <ShockwaveMesh key={shock.id} shockwave={shock} />
             ))}
 
             {/* Obstacles: Asteroids and Alien Ships */}
@@ -1074,38 +1245,41 @@ export default function SpaceRunnerGame({
 
       {/* --- PHASE 0: PRE-MISSION BRIEFING PROMPT (PLANET & DIFFICULTY SELECTION) --- */}
       {phase === 'briefing' && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-xl overflow-y-auto">
-          <div className="apple-glass rounded-3xl p-6 md:p-8 max-w-3xl w-full border border-white/[0.12] shadow-2xl space-y-6 my-auto text-left">
+        <div className="absolute inset-0 z-40 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-black/85 backdrop-blur-xl overflow-y-auto">
+          <div className="apple-glass rounded-3xl p-5 sm:p-7 md:p-8 max-w-3xl w-full max-h-[94vh] overflow-y-auto border border-white/[0.12] shadow-2xl space-y-5 my-auto text-left">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3.5">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-[#0071e3]/20 border border-[#2997ff]/30 px-2.5 py-0.5 text-[10px] font-semibold text-[#2997ff] uppercase tracking-wider">
                     NASA Mission Window • Flight Briefing
                   </span>
                   <span className="text-[11px] font-mono text-[#86868b] flex items-center gap-1">
                     <Clock size={12} /> {selectedDuration}s FLIGHT
                   </span>
+                  <span className="text-[10px] text-emerald-400 border border-emerald-400/30 rounded-full px-2 py-0.5 flex items-center gap-1">
+                    <Smartphone size={10} /> Mobile Ready
+                  </span>
                 </div>
-                <h2 className="mt-1.5 text-2xl md:text-3xl font-bold tracking-tight text-white apple-headline">
+                <h2 className="mt-1.5 text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-white apple-headline">
                   Configure Deep Space Voyage
                 </h2>
                 <p className="text-xs text-[#86868b] mt-0.5">
-                  Select target destination, calibrate asteroid density parameters, and initiate light-speed launch.
+                  Select destination planet, flight difficulty, and mission duration.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={onExit}
-                className="apple-pill-btn flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.06] hover:bg-white/[0.12] px-3.5 py-1.5 text-xs text-[#86868b] hover:text-white transition"
+                className="apple-pill-btn flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.06] hover:bg-white/[0.12] px-3 py-1.5 text-xs text-[#86868b] hover:text-white transition"
               >
                 <ArrowLeft size={13} /> Exit
               </button>
             </div>
 
             {/* Section 1: Choose Target Planet */}
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold tracking-wider text-white uppercase flex items-center gap-1.5">
                   <Compass size={14} className="text-[#2997ff]" /> 1. Select Target Planet / Destination
@@ -1115,7 +1289,7 @@ export default function SpaceRunnerGame({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
                 {PLANETS.map((planet) => {
                   const isSelected = selectedPlanet.id === planet.id
                   return (
@@ -1126,29 +1300,26 @@ export default function SpaceRunnerGame({
                         audioTelemetry.playClick()
                         setSelectedPlanet(planet)
                       }}
-                      className={`group relative rounded-2xl p-4 text-left transition-all duration-200 border ${
+                      className={`group relative rounded-2xl p-3 sm:p-4 text-left transition-all duration-200 border ${
                         isSelected
                           ? 'border-[#2997ff] bg-[#0071e3]/15 shadow-[0_0_24px_rgba(41,151,255,0.25)]'
                           : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/[0.18]'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-1.5">
                         <div
-                          className="h-4 w-4 rounded-full shadow-md"
+                          className="h-3.5 w-3.5 rounded-full shadow-md"
                           style={{ backgroundColor: planet.color }}
                         />
                         <span className="text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded-full bg-white/10 text-white/80">
                           {planet.tag}
                         </span>
                       </div>
-                      <p className="font-semibold text-sm text-white group-hover:text-[#2997ff] transition">
+                      <p className="font-semibold text-xs sm:text-sm text-white group-hover:text-[#2997ff] transition">
                         {planet.name}
                       </p>
                       <p className="text-[10px] text-[#86868b] mt-0.5 font-mono">
                         {planet.distanceKm}
-                      </p>
-                      <p className="text-[10px] text-[#86868b] mt-2 line-clamp-2 leading-relaxed">
-                        {planet.description}
                       </p>
                     </button>
                   )
@@ -1157,12 +1328,12 @@ export default function SpaceRunnerGame({
             </div>
 
             {/* Section 2: Choose Difficulty */}
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <p className="text-xs font-semibold tracking-wider text-white uppercase flex items-center gap-1.5">
                 <Target size={14} className="text-[#2997ff]" /> 2. Select Asteroid & Combat Difficulty
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2.5">
                 {(Object.keys(DIFFICULTIES) as Difficulty[]).map((diffKey) => {
                   const d = DIFFICULTIES[diffKey]
                   const isSelected = selectedDifficulty === diffKey
@@ -1174,25 +1345,22 @@ export default function SpaceRunnerGame({
                         audioTelemetry.playClick()
                         setSelectedDifficulty(diffKey)
                       }}
-                      className={`rounded-2xl p-4 text-left transition-all duration-200 border ${
+                      className={`rounded-2xl p-3 sm:p-4 text-left transition-all duration-200 border ${
                         isSelected
                           ? 'border-[#2997ff] bg-[#0071e3]/15 shadow-[0_0_20px_rgba(41,151,255,0.25)]'
                           : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/[0.18]'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-sm text-white flex items-center gap-1.5">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-xs sm:text-sm text-white flex items-center gap-1.5">
                           <span
                             className="h-2 w-2 rounded-full"
                             style={{ backgroundColor: d.colorBadge }}
                           />
                           {d.name}
                         </span>
-                        <span className="text-[10px] font-mono text-[#86868b] uppercase">
-                          {d.label}
-                        </span>
                       </div>
-                      <p className="text-[11px] text-[#86868b] leading-relaxed">
+                      <p className="text-[10px] text-[#86868b] leading-tight">
                         {d.description}
                       </p>
                     </button>
@@ -1202,7 +1370,7 @@ export default function SpaceRunnerGame({
             </div>
 
             {/* Section 3: Choose Mission Duration (30s to 60s) */}
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold tracking-wider text-white uppercase flex items-center gap-1.5">
                   <Clock size={14} className="text-[#ff9f0a]" /> 3. Select Mission Duration (30s – 60s)
@@ -1212,11 +1380,11 @@ export default function SpaceRunnerGame({
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2.5">
                 {[
-                  { sec: 30, title: '30 Seconds', tag: 'Fast Sprint', desc: 'Hyper-paced evaluation run' },
-                  { sec: 45, title: '45 Seconds', tag: 'Recommended', desc: 'Optimal hackathon pacing' },
-                  { sec: 60, title: '60 Seconds', tag: 'Full Flight', desc: 'Complete 1-minute voyage' },
+                  { sec: 30, title: '30 Seconds', tag: 'Fast Sprint', desc: 'Quick demo' },
+                  { sec: 45, title: '45 Seconds', tag: 'Recommended', desc: 'Optimal pacing' },
+                  { sec: 60, title: '60 Seconds', tag: 'Full Flight', desc: '1-min voyage' },
                 ].map((dOpt) => {
                   const isSel = selectedDuration === dOpt.sec
                   return (
@@ -1227,52 +1395,43 @@ export default function SpaceRunnerGame({
                         audioTelemetry.playClick()
                         setSelectedDuration(dOpt.sec)
                       }}
-                      className={`rounded-2xl p-3.5 text-left transition-all duration-200 border ${
+                      className={`rounded-2xl p-3 sm:p-3.5 text-left transition-all duration-200 border ${
                         isSel
                           ? 'border-[#ff9f0a] bg-[#ff9f0a]/15 shadow-[0_0_20px_rgba(255,159,10,0.25)]'
                           : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/[0.18]'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-sm text-white">{dOpt.title}</span>
-                        <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-full bg-white/10 text-[#ff9f0a]">
-                          {dOpt.tag}
-                        </span>
+                        <span className="font-bold text-xs sm:text-sm text-white">{dOpt.title}</span>
                       </div>
-                      <p className="text-[10px] text-[#86868b] leading-tight">{dOpt.desc}</p>
+                      <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-full bg-white/10 text-[#ff9f0a]">
+                        {dOpt.tag}
+                      </span>
                     </button>
                   )
                 })}
               </div>
             </div>
 
-            {/* Section 4: Mission Rules & Features Banner */}
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs text-[#86868b]">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-white font-medium">
-                  <Sparkles size={14} className="text-[#ff9f0a]" />
-                  <span>Mission Rules & Features:</span>
-                </div>
-                <p>
-                  • <strong>Duration</strong>: <strong>{selectedDuration} Seconds</strong> (Checkpoints at <strong>33%</strong> and <strong>66%</strong>).
-                </p>
-                <p>
-                  • <strong>Meteor Slingshot</strong>: Blasting an asteroid shoots a kinetic meteorite into alien ships for <strong>+750 PTS</strong>!
-                </p>
-                <p>
-                  • <strong>3 Lives</strong>: Collisions respawn at last checkpoint with a temporary energy shield.
-                </p>
+            {/* Section 4: Mobile & Desktop Controls Banner */}
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3.5 text-xs text-[#86868b] space-y-1">
+              <div className="flex items-center gap-2 text-white font-medium">
+                <Sparkles size={13} className="text-[#ff9f0a]" />
+                <span>Controls & Mobile Tips:</span>
               </div>
-
-              <div className="text-right shrink-0 font-mono text-[11px] text-[#2997ff]">
-                Target: {selectedPlanet.name.toUpperCase()}
-                <br />
-                Duration: {selectedDuration}s @ 1.0c
-              </div>
+              <p>
+                • <strong>Desktop</strong>: <kbd className="px-1 py-0.5 rounded bg-white/10 font-mono text-[10px]">A</kbd> / <kbd className="px-1 py-0.5 rounded bg-white/10 font-mono text-[10px]">D</kbd> or <kbd className="px-1 py-0.5 rounded bg-white/10 font-mono text-[10px]">←</kbd> <kbd className="px-1 py-0.5 rounded bg-white/10 font-mono text-[10px]">→</kbd> to steer, <kbd className="px-1 py-0.5 rounded bg-white/10 font-mono text-[10px]">Space</kbd> to blast lasers.
+              </p>
+              <p>
+                • <strong>Mobile</strong>: Swipe left/right or use on-screen thumb buttons; tap screen or the big <strong>FIRE</strong> button to shoot!
+              </p>
+              <p>
+                • <strong>Slingshot</strong>: Blasting asteroids shoots kinetic meteorites into alien ships for <strong>+750 PTS</strong>!
+              </p>
             </div>
 
             {/* Launch Button */}
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center gap-3 pt-1">
               <button
                 type="button"
                 onClick={startLaunchSequence}
@@ -1284,7 +1443,7 @@ export default function SpaceRunnerGame({
               <button
                 type="button"
                 onClick={onExit}
-                className="apple-pill-btn border border-white/[0.12] bg-white/[0.06] hover:bg-white/[0.12] px-6 py-3.5 text-sm font-medium text-white"
+                className="apple-pill-btn border border-white/[0.12] bg-white/[0.06] hover:bg-white/[0.12] px-5 py-3.5 text-sm font-medium text-white"
               >
                 Back
               </button>
@@ -1296,12 +1455,12 @@ export default function SpaceRunnerGame({
       {/* --- PHASE 1: LAUNCHPAD COUNTDOWN --- */}
       {phase === 'launching' && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 text-center bg-black/40 backdrop-blur-xs">
-          <div className="apple-glass rounded-3xl p-8 max-w-md w-full border border-white/[0.1] shadow-2xl space-y-6">
+          <div className="apple-glass rounded-3xl p-7 max-w-md w-full border border-white/[0.1] shadow-2xl space-y-6">
             <div>
               <span className="rounded-full border border-white/[0.12] bg-white/[0.06] px-3.5 py-1 text-xs text-[#2997ff] font-medium uppercase tracking-widest">
                 Cape Canaveral Launchpad 39A
               </span>
-              <h2 className="mt-3 text-4xl font-bold tracking-tight apple-headline">
+              <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight apple-headline">
                 MISSION LAUNCH
               </h2>
               <p className="mt-2 text-xs text-[#86868b] leading-relaxed">
@@ -1324,7 +1483,7 @@ export default function SpaceRunnerGame({
         </div>
       )}
 
-      {/* --- PHASE 2: PLAYING OVERLAY (CLEAR HORIZON HUD) --- */}
+      {/* --- PHASE 2: PLAYING OVERLAY (CLEAR HORIZON HUD & DUAL THUMB ARCADE PAD) --- */}
       {phase === 'playing' && (
         <>
           {/* Top-Edge 2.5px Flight Vector Progress Bar */}
@@ -1379,10 +1538,10 @@ export default function SpaceRunnerGame({
             </div>
           </div>
 
-          {/* Floating Side Notifications (Moved to Upper Right to never block center vision) */}
+          {/* Floating Side Notifications (Upper Right to never block center vision) */}
           {checkpointNotification && (
-            <div className="absolute top-20 right-14 z-30 animate-bounce">
-              <div className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-4 py-1.5 backdrop-blur-xl text-xs font-semibold text-[#34c759] shadow-xl flex items-center gap-2">
+            <div className="absolute top-18 right-4 sm:right-14 z-30 animate-bounce">
+              <div className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3.5 py-1.5 backdrop-blur-xl text-xs font-semibold text-[#34c759] shadow-xl flex items-center gap-2">
                 <CheckCircle size={14} />
                 {checkpointNotification}
               </div>
@@ -1390,62 +1549,92 @@ export default function SpaceRunnerGame({
           )}
 
           {comboBanner && (
-            <div className="absolute top-28 right-14 z-30 animate-pulse">
-              <div className="rounded-full border border-amber-400/50 bg-amber-500/25 px-4 py-1.5 backdrop-blur-xl text-xs font-bold text-[#ff9f0a] shadow-xl flex items-center gap-2">
+            <div className="absolute top-26 right-4 sm:right-14 z-30 animate-pulse">
+              <div className="rounded-full border border-amber-400/50 bg-amber-500/25 px-3.5 py-1.5 backdrop-blur-xl text-xs font-bold text-[#ff9f0a] shadow-xl flex items-center gap-2">
                 <Flame size={14} />
                 {comboBanner}
               </div>
             </div>
           )}
 
-          {/* Bottom On-Screen Arcade Controls (Touch & Keyboard Helper) */}
-          <div className="absolute bottom-6 inset-x-0 z-20 flex flex-col items-center gap-3 px-6 pointer-events-none">
-            <div className="pointer-events-auto flex items-center gap-4 bg-[#161617]/70 backdrop-blur-2xl p-2 rounded-full border border-white/[0.1] shadow-2xl">
+          {/* DUAL THUMB MOBILE & DESKTOP CONTROLS */}
+          <div className="absolute bottom-5 inset-x-0 z-30 flex items-end justify-between px-4 sm:px-8 pointer-events-none safe-bottom">
+            {/* Left Thumb Cluster: Steer Left & Steer Right */}
+            <div className="pointer-events-auto flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={moveLeft}
-                className="apple-pill-btn flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.08] hover:bg-white/[0.18] px-5 py-3 text-xs font-medium text-white active:scale-95 transition"
+                onTouchStart={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  moveLeft()
+                }}
+                aria-label="Steer Left"
+                className="apple-pill-btn flex flex-col items-center justify-center h-14 w-14 sm:h-16 sm:w-16 rounded-2xl border border-white/[0.18] bg-[#161617]/80 hover:bg-white/[0.18] active:scale-90 active:bg-[#0071e3]/40 backdrop-blur-2xl shadow-2xl transition touch-none"
               >
-                <ArrowLeft size={16} /> Steer Left (A / ←)
-              </button>
-
-              <button
-                type="button"
-                onClick={fireLaser}
-                className="apple-pill-btn flex items-center gap-2 rounded-full bg-gradient-to-r from-[#0071e3] to-[#2997ff] hover:opacity-90 px-7 py-3 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(0,113,227,0.4)] active:scale-95 transition"
-              >
-                <Flame size={16} /> Fire Lasers (Space)
+                <ArrowLeft size={22} className="text-white" />
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[#86868b] mt-0.5">Left</span>
               </button>
 
               <button
                 type="button"
                 onClick={moveRight}
-                className="apple-pill-btn flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.08] hover:bg-white/[0.18] px-5 py-3 text-xs font-medium text-white active:scale-95 transition"
+                onTouchStart={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  moveRight()
+                }}
+                aria-label="Steer Right"
+                className="apple-pill-btn flex flex-col items-center justify-center h-14 w-14 sm:h-16 sm:w-16 rounded-2xl border border-white/[0.18] bg-[#161617]/80 hover:bg-white/[0.18] active:scale-90 active:bg-[#0071e3]/40 backdrop-blur-2xl shadow-2xl transition touch-none"
               >
-                Steer Right (D / →) <ArrowRight size={16} />
+                <ArrowRight size={22} className="text-white" />
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[#86868b] mt-0.5">Right</span>
               </button>
             </div>
 
-            <p className="text-[11px] text-[#86868b] tracking-wide bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">
-              💡 Tip: Blast asteroids to slingshot burning meteorites into oncoming alien warships!
-            </p>
+            {/* Desktop Center Tip */}
+            <div className="hidden lg:flex flex-col items-center pointer-events-none pb-2 text-[11px] text-[#86868b] font-mono">
+              <span className="bg-black/50 px-3 py-1 rounded-full border border-white/10 backdrop-blur-md">
+                Desktop: A/D or Arrow keys • Space to Fire • Swipe/Tap on Mobile
+              </span>
+            </div>
+
+            {/* Right Thumb Cluster: Big Glowing Blast Cannon Button */}
+            <div className="pointer-events-auto flex items-center">
+              <button
+                type="button"
+                onClick={fireLaser}
+                onTouchStart={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  fireLaser()
+                }}
+                aria-label="Fire Plasma Lasers"
+                className="flex flex-col items-center justify-center h-16 w-16 sm:h-18 sm:w-18 rounded-full bg-gradient-to-tr from-[#0071e3] to-[#2997ff] hover:opacity-95 active:scale-90 active:from-[#005bb5] active:to-[#0071e3] border-2 border-white/40 shadow-[0_0_28px_rgba(41,151,255,0.7)] backdrop-blur-2xl transition touch-none"
+              >
+                <Crosshair size={24} className="text-white" />
+                <span className="text-[9px] font-extrabold uppercase tracking-widest text-white mt-0.5">
+                  FIRE
+                </span>
+              </button>
+            </div>
           </div>
         </>
       )}
 
       {/* --- HUD HEADER BAR (INTEGRATED COMPACT TIMELINE - ZERO CENTER OBSTRUCTION) --- */}
-      <header className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-4 md:px-7 bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-xs">
+      <header className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-3.5 sm:p-4 md:px-7 bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-xs safe-top">
         {/* Left: Exit & Destination Badge */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={onExit}
-            className="apple-pill-btn flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.08] hover:bg-white/[0.16] px-3.5 py-1.5 text-xs font-medium text-white transition"
+            className="apple-pill-btn flex items-center gap-1 rounded-full border border-white/[0.12] bg-white/[0.08] hover:bg-white/[0.16] px-3 py-1.5 text-xs font-medium text-white transition"
           >
-            <ArrowLeft size={13} /> Exit
+            <ArrowLeft size={13} /> <span className="hidden sm:inline">Exit</span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <span
               className="h-2.5 w-2.5 rounded-full shadow-sm"
               style={{ backgroundColor: selectedPlanet.color }}
@@ -1453,21 +1642,21 @@ export default function SpaceRunnerGame({
             <span className="font-semibold text-xs text-white tracking-tight">
               {selectedPlanet.name.toUpperCase()}
             </span>
-            <span className="text-[10px] font-mono text-[#86868b] uppercase border border-white/10 rounded-full px-2 py-0.5">
+            <span className="text-[9px] font-mono text-[#86868b] uppercase border border-white/10 rounded-full px-1.5 py-0.2">
               {diffConfig.name}
             </span>
           </div>
         </div>
 
-        {/* Center: Slim Integrated Flight Capsule (Takes 0 vertical space below the bar!) */}
+        {/* Center: Slim Integrated Flight Capsule */}
         {phase === 'playing' && (
-          <div className="hidden sm:flex items-center gap-3 rounded-full border border-white/[0.12] bg-[#161617]/75 px-4 py-1.5 backdrop-blur-xl shadow-lg">
-            <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-[#2997ff]">
-              <Clock size={13} className="text-[#ff9f0a]" />
+          <div className="flex items-center gap-2 sm:gap-3 rounded-full border border-white/[0.12] bg-[#161617]/75 px-3 sm:px-4 py-1 sm:py-1.5 backdrop-blur-xl shadow-lg">
+            <div className="flex items-center gap-1 font-mono text-xs font-semibold text-[#2997ff]">
+              <Clock size={12} className="text-[#ff9f0a]" />
               <span>{formatTime(remainingSeconds)}</span>
             </div>
             <span className="text-white/20">|</span>
-            <div className="w-24 h-1.5 rounded-full bg-white/10 overflow-hidden relative">
+            <div className="w-16 sm:w-24 h-1.5 rounded-full bg-white/10 overflow-hidden relative">
               <div
                 className="h-full bg-gradient-to-r from-[#0071e3] to-[#34c759]"
                 style={{ width: `${progressPercent}%` }}
@@ -1487,26 +1676,18 @@ export default function SpaceRunnerGame({
             <span className="font-mono text-xs font-bold text-white/90">
               {Math.round(progressPercent)}%
             </span>
-            <span className="text-white/20">|</span>
-            <span className="text-[10px] font-mono text-[#86868b] uppercase">
-              {progressPercent < 33
-                ? 'Vector Alpha'
-                : progressPercent < 66
-                  ? 'Vector Bravo'
-                  : `${selectedPlanet.name} Orbit`}
-            </span>
           </div>
         )}
 
         {/* Right: Lives Counter & Score */}
         {phase === 'playing' ? (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Lives Indicator */}
-            <div className="flex items-center gap-1 rounded-full border border-white/[0.1] bg-[#161617]/80 px-3 py-1 backdrop-blur-xl">
+            <div className="flex items-center gap-1 rounded-full border border-white/[0.1] bg-[#161617]/80 px-2.5 sm:px-3 py-1 backdrop-blur-xl">
               {[1, 2, 3].map((heartIndex) => (
                 <Heart
                   key={heartIndex}
-                  size={14}
+                  size={13}
                   className={
                     heartIndex <= lives
                       ? 'fill-red-500 text-red-500 animate-pulse'
@@ -1517,22 +1698,22 @@ export default function SpaceRunnerGame({
             </div>
 
             {/* Combat Score */}
-            <div className="rounded-full border border-white/[0.1] bg-[#161617]/80 px-3.5 py-1 backdrop-blur-xl font-mono text-xs font-semibold text-[#2997ff]">
-              SCORE: {score}
+            <div className="rounded-full border border-white/[0.1] bg-[#161617]/80 px-2.5 sm:px-3.5 py-1 backdrop-blur-xl font-mono text-xs font-semibold text-[#2997ff]">
+              {score}
             </div>
           </div>
         ) : (
-          <div className="text-xs font-mono text-[#86868b]">LIGHT SPEED 1.0c</div>
+          <div className="text-[10px] font-mono text-[#86868b]">LIGHT SPEED 1.0c</div>
         )}
       </header>
 
       {/* --- PHASE 3: GAMEOVER SCREEN (AFTER 3 LIVES LOST) --- */}
       {phase === 'gameover' && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-8 max-w-md w-full border border-red-500/30 shadow-2xl text-center space-y-6">
+        <div className="absolute inset-0 z-40 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-red-500/30 shadow-2xl text-center space-y-5">
             <div className="flex justify-center">
-              <div className="p-4 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
-                <Shield size={40} />
+              <div className="p-3.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                <Shield size={36} />
               </div>
             </div>
 
@@ -1540,34 +1721,34 @@ export default function SpaceRunnerGame({
               <p className="text-xs font-semibold tracking-widest text-red-400 uppercase">
                 Vessel Destroyed • All 3 Lives Depleted
               </p>
-              <h2 className="mt-1 text-3xl font-bold apple-headline text-white">
+              <h2 className="mt-1 text-2xl sm:text-3xl font-bold apple-headline text-white">
                 GAME OVER
               </h2>
-              <p className="mt-2 text-xs text-[#86868b]">
+              <p className="mt-1.5 text-xs text-[#86868b]">
                 Spacecraft hull compromised in light-speed transit vector to {selectedPlanet.name}.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 py-3 border-y border-white/[0.08] text-left">
+            <div className="grid grid-cols-2 gap-2.5 py-3 border-y border-white/[0.08] text-left">
               <div>
                 <p className="text-[10px] text-[#86868b] uppercase">Flight Time</p>
-                <p className="text-lg font-bold text-white font-mono">{formatTime(elapsedSeconds)}</p>
+                <p className="text-base font-bold text-white font-mono">{formatTime(elapsedSeconds)}</p>
               </div>
               <div>
                 <p className="text-[10px] text-[#86868b] uppercase">Score</p>
-                <p className="text-lg font-bold text-[#2997ff] font-mono">{score}</p>
+                <p className="text-base font-bold text-[#2997ff] font-mono">{score}</p>
               </div>
               <div>
                 <p className="text-[10px] text-[#86868b] uppercase">Aliens Destroyed</p>
-                <p className="text-lg font-bold text-purple-400 font-mono">{aliensDestroyed}</p>
+                <p className="text-base font-bold text-purple-400 font-mono">{aliensDestroyed}</p>
               </div>
               <div>
                 <p className="text-[10px] text-[#86868b] uppercase">Asteroids Smashed</p>
-                <p className="text-lg font-bold text-slate-300 font-mono">{asteroidsDestroyed}</p>
+                <p className="text-base font-bold text-slate-300 font-mono">{asteroidsDestroyed}</p>
               </div>
               <div className="col-span-2">
                 <p className="text-[10px] text-[#86868b] uppercase">Slingshot Combos</p>
-                <p className="text-lg font-bold text-amber-400 font-mono">{slingshotCombos}</p>
+                <p className="text-base font-bold text-amber-400 font-mono">{slingshotCombos}</p>
               </div>
             </div>
 
@@ -1584,36 +1765,36 @@ export default function SpaceRunnerGame({
         </div>
       )}
 
-      {/* --- PHASE 4: VICTORY SCREEN (5 MINUTES / 100% REACHED) --- */}
+      {/* --- PHASE 4: VICTORY SCREEN (TARGET ORBIT REACHED) --- */}
       {phase === 'victory' && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-8 max-w-lg w-full border border-emerald-500/30 shadow-2xl text-center space-y-6">
+        <div className="absolute inset-0 z-40 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md">
+          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 shadow-2xl text-center space-y-5">
             <div className="flex justify-center">
-              <div className="p-4 rounded-full bg-emerald-500/10 text-[#34c759] border border-emerald-500/20">
-                <Award size={40} />
+              <div className="p-3.5 rounded-full bg-emerald-500/10 text-[#34c759] border border-emerald-500/20">
+                <Award size={36} />
               </div>
             </div>
 
             <div>
-              <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3.5 py-1 text-xs font-semibold text-[#34c759] uppercase tracking-wider">
+              <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-[#34c759] uppercase tracking-wider">
                 {selectedPlanet.name.toUpperCase()} ORBIT ACHIEVED • {selectedDuration}s FLIGHT COMPLETE
               </span>
-              <h2 className="mt-2 text-4xl font-extrabold tracking-tight apple-headline text-white">
+              <h2 className="mt-2 text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight apple-headline text-white">
                 VICTORY! MISSION COMPLETE
               </h2>
-              <p className="mt-2 text-xs text-[#86868b] leading-relaxed">
+              <p className="mt-1.5 text-xs text-[#86868b] leading-relaxed">
                 You survived the {selectedDuration}-second light-speed transit on <strong>{diffConfig.name}</strong> mode, repelled hostile alien incursions, slingshotted meteorites, and safely entered {selectedPlanet.name} planetary orbit!
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 py-4 border-y border-white/[0.08] text-left">
+            <div className="grid grid-cols-2 gap-2.5 py-3 border-y border-white/[0.08] text-left">
               <div>
                 <p className="text-[10px] text-[#86868b] uppercase">Final Pilot Rank</p>
-                <p className="text-xl font-bold text-[#34c759] font-mono">ACE PILOT (A+)</p>
+                <p className="text-lg font-bold text-[#34c759] font-mono">ACE PILOT (A+)</p>
               </div>
               <div>
                 <p className="text-[10px] text-[#86868b] uppercase">Total Combat Score</p>
-                <p className="text-xl font-bold text-[#2997ff] font-mono">{score + 1500}</p>
+                <p className="text-lg font-bold text-[#2997ff] font-mono">{score + 1500}</p>
               </div>
               <div>
                 <p className="text-[10px] text-[#86868b] uppercase">Hostiles Destroyed</p>
