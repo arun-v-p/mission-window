@@ -245,13 +245,13 @@ function LaserBoltMesh({ bolt }: { bolt: LaserBolt }) {
 // Destination Target Planet (The Moon or Mars at 100%)
 function DestinationPlanet({ progress }: { progress: number }) {
   const zPos = -120 + progress * 0.95
-  const scale = 3.5 + progress * 0.08
+  const s = 3.5 + progress * 0.08
 
   return (
-    <group position={[0, 0, zPos]}>
+    <group position={[0, 0, zPos]} scale={[s, s, s]}>
       {/* Red Planet Mars / Moon */}
       <mesh>
-        <sphereGeometry args={[scale, 32, 32]} />
+        <sphereGeometry args={[1, 32, 32]} />
         <meshStandardMaterial
           color="#ff6b4a"
           roughness={0.75}
@@ -261,7 +261,7 @@ function DestinationPlanet({ progress }: { progress: number }) {
 
       {/* Atmospheric Glow */}
       <mesh scale={[1.08, 1.08, 1.08]}>
-        <sphereGeometry args={[scale, 24, 24]} />
+        <sphereGeometry args={[1, 24, 24]} />
         <meshStandardMaterial
           color="#ff9f0a"
           transparent
@@ -575,7 +575,7 @@ export default function SpaceRunnerGame({
   }
 
   return (
-    <div className="relative h-screen w-full bg-[#000000] overflow-hidden select-none font-sans text-white">
+    <div className="fixed inset-0 z-[100] h-screen w-screen bg-[#000000] overflow-hidden select-none font-sans text-white">
       {/* Red screen flash when taking damage */}
       {flashDamage && (
         <div className="pointer-events-none absolute inset-0 z-50 bg-red-600/35 transition-opacity" />

@@ -443,6 +443,25 @@ function App() {
     setScreen(nextScreen)
   }
 
+  if (isRunnerModeActive) {
+    return (
+      <div className="fixed inset-0 z-[100] h-screen w-screen bg-black overflow-hidden">
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black text-white">
+              <div className="text-center space-y-3">
+                <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-[#2997ff]" />
+                <p className="text-xs font-mono tracking-[0.2em] text-[#86868b]">PREPARING LAUNCH PAD...</p>
+              </div>
+            </div>
+          }
+        >
+          <SpaceRunnerGame onExit={() => setIsRunnerModeActive(false)} />
+        </Suspense>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#000000] text-[#f5f5f7] selection:bg-[#0071e3] selection:text-white">
       {screen !== 'mission-control' && screen !== 'debrief' && (
@@ -744,21 +763,6 @@ function App() {
           />
         ) : null}
       </main>
-
-      {isRunnerModeActive && (
-        <Suspense
-          fallback={
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black text-white">
-              <div className="text-center space-y-3">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-[#2997ff]" />
-                <p className="text-xs font-mono tracking-[0.2em] text-[#86868b]">PREPARING LAUNCH PAD...</p>
-              </div>
-            </div>
-          }
-        >
-          <SpaceRunnerGame onExit={() => setIsRunnerModeActive(false)} />
-        </Suspense>
-      )}
     </div>
   )
 }
