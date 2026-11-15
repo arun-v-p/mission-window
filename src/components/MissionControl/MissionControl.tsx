@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   ArrowRight,
@@ -9,6 +10,8 @@ import {
   Radio,
   Satellite,
   Zap,
+  Flame,
+  RadioTower,
 } from 'lucide-react'
 import {
   communicationSystems,
@@ -16,6 +19,7 @@ import {
   powerSystems,
   storageSystems,
 } from '../../data/spacecraftOptions'
+import { audioTelemetry } from '../../utils/audioTelemetry'
 import {
   calculateRemainingBattery,
   calculateRemainingStorage,
@@ -98,6 +102,23 @@ function MissionControl({
     missionState.currentTimeMinute >= missionState.missionWindowDurationMinutes
   const nextBoundary = getNextMissionBoundary(missionState)
   const latestEvent = eventHistory[eventHistory.length - 1]
+  const [activeManeuver, setActiveManeuver] = useState<string | null>(null)
+
+  const triggerAttitudeTrim = () => {
+    audioTelemetry.playThrusterManeuver()
+    setActiveManeuver(
+      'Attitude RCS Pulse Complete • Solar Panels Realigned to Sunlight (+3.5W)',
+    )
+    setTimeout(() => setActiveManeuver(null), 4500)
+  }
+
+  const triggerDownlinkBurst = () => {
+    audioTelemetry.playClick()
+    setActiveManeuver(
+      'Ground DSN Lock Acquired (Goldstone Deep Space Station) • Telemetry Buffer Flushed',
+    )
+    setTimeout(() => setActiveManeuver(null), 4500)
+  }
   const observationById = new Map(
     missionState.missionEventState.observationCatalogue.map((observation) => [
       observation.id,
@@ -144,90 +165,108 @@ function MissionControl({
     <div className="space-y-5 lg:space-y-6">
       <section
         aria-label="Orbital mission environment"
-        className="mission-viewport relative isolate h-[min(88vh,1100px)] min-h-[860px] overflow-hidden rounded-xl border border-cyan-100/10 bg-[#020611] shadow-2xl shadow-black/50 sm:rounded-2xl xl:h-[min(76vh,900px)] xl:min-h-[650px]"
+        className="mission-viewport relative isolate h-[min(88vh,1100px)] min-h-[860px] overflow-hidden rounded-3xl border border-white/[0.1] bg-[#000000] shadow-[0_24px_60px_rgba(0,0,0,0.8)] xl:h-[min(76vh,900px)] xl:min-h-[650px]"
       >
         <div className="absolute inset-0">{orbitalScene}</div>
-        <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-[#030811]/65 via-transparent to-[#030811]/95" />
+        <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-[#000000]/60 via-transparent to-[#000000]/90" />
 
-        <div className="relative z-10 flex h-full flex-col justify-between p-3 sm:p-5 lg:p-6">
+        <div className="relative z-10 flex h-full flex-col justify-between p-4 sm:p-6 lg:p-7">
           <div className="flex items-start justify-between gap-3 sm:gap-6">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="rounded-lg border border-cyan-200/20 bg-[#061322]/80 p-2.5 text-cyan-200 shadow-lg shadow-cyan-950/30 backdrop-blur-md sm:p-3">
+            <div className="flex min-w-0 items-center gap-3.5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#0071e3]/20 bg-[#0071e3]/15 text-[#2997ff] shadow-lg backdrop-blur-2xl">
                 <Satellite size={20} />
               </div>
               <div className="min-w-0">
-                <p className="text-[9px] font-semibold tracking-[0.24em] text-cyan-200/75 sm:text-[10px]">
-                  MISSION WINDOW
+                <p className="text-[10px] font-semibold tracking-[0.24em] text-[#2997ff] uppercase">
+                  Mission Window
                 </p>
-                <h1 className="mt-1 truncate text-sm font-semibold tracking-wide text-white sm:text-base">
+                <h1 className="mt-0.5 truncate text-base font-semibold tracking-tight text-white apple-headline">
                   Orbital Science Mission
                 </h1>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      missionEnded
-                        ? 'bg-amber-300'
-                        : 'animate-pulse bg-emerald-300'
-                    }`}
-                  />
-                  <span className="text-[9px] font-semibold tracking-[0.16em] text-slate-300 sm:text-[10px]">
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                      missionEnded ? 'bg-amber-400' : 'bg-[#34c759]'
+                    }`} />
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                      missionEnded ? 'bg-amber-400' : 'bg-[#34c759]'
+                    }`} />
+                  </span>
+                  <span className="text-[10px] font-medium tracking-[0.16em] text-[#86868b] uppercase">
                     {missionEnded
-                      ? 'MISSION COMPLETE'
+                      ? 'Mission Complete'
                       : missionState.status === 'ready'
-                        ? 'MISSION READY'
-                        : 'MISSION IN PROGRESS'}
+                        ? 'Simulation Ready'
+                        : 'Active Orbit'}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="shrink-0 rounded-lg border border-white/10 bg-[#061322]/80 px-3 py-2.5 text-right shadow-xl backdrop-blur-md sm:px-4 sm:py-3">
-              <div className="flex items-center justify-end gap-2 text-cyan-200">
-                <Clock3 size={14} />
-                <span className="text-[9px] font-semibold tracking-[0.18em] text-slate-400 sm:text-[10px]">
-                  MISSION ELAPSED
+            <div className="shrink-0 rounded-2xl border border-white/[0.08] bg-[#161617]/75 px-4 py-2.5 text-right shadow-2xl backdrop-blur-2xl">
+              <div className="flex items-center justify-end gap-1.5 text-[#2997ff]">
+                <Clock3 size={13} />
+                <span className="text-[10px] font-semibold tracking-[0.16em] text-[#86868b] uppercase">
+                  Mission Elapsed
                 </span>
               </div>
-              <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-white sm:text-2xl">
+              <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums text-white">
                 T+{formatMinuteClock(missionState.currentTimeMinute)}
               </p>
-              <p className="text-[9px] tracking-wide text-slate-500 sm:text-[10px]">
-                {formatMinuteClock(missionState.missionWindowDurationMinutes)}{' '}
-                MIN WINDOW
+              <p className="text-[10px] tracking-wide text-[#86868b]">
+                {formatMinuteClock(missionState.missionWindowDurationMinutes)} MIN WINDOW
               </p>
             </div>
           </div>
+
+          {activeManeuver && (
+            <div
+              role="status"
+              className="mission-event-toast ml-auto mt-3 w-full max-w-md rounded-2xl border border-[#0071e3]/40 bg-[#161617]/90 p-4 shadow-2xl backdrop-blur-2xl"
+            >
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2997ff] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#2997ff]" />
+                </span>
+                <span className="text-[10px] font-semibold tracking-[0.18em] text-[#2997ff] uppercase">
+                  Flight Director Command Executed
+                </span>
+              </div>
+              <p className="mt-1 text-xs font-medium text-white">{activeManeuver}</p>
+            </div>
+          )}
 
           {latestEvent && (
             <div
               key={latestEvent.id}
               role="status"
-              className="mission-event-toast ml-auto mt-3 w-full max-w-md rounded-lg border border-amber-200/25 bg-[#111521]/90 p-3 shadow-xl backdrop-blur-xl sm:mt-4 sm:p-3.5"
+              className="mission-event-toast ml-auto mt-3 w-full max-w-md rounded-2xl border border-amber-400/25 bg-[#1c1c1e]/85 p-4 shadow-2xl backdrop-blur-2xl sm:mt-4"
             >
               <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-                <span className="text-[9px] font-bold tracking-[0.18em] text-amber-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                <span className="text-[10px] font-semibold tracking-[0.18em] text-amber-300 uppercase">
                   {latestEvent.outcome === 'applied'
-                    ? 'MISSION EVENT'
-                    : 'EVENT NOT APPLIED'}
+                    ? 'Mission Event'
+                    : 'Event Skipped'}
                 </span>
-                <span className="ml-auto text-[9px] text-slate-500">
+                <span className="ml-auto text-[10px] font-mono text-[#86868b]">
                   T+{formatQuantity(latestEvent.timeMinute)} MIN
                 </span>
               </div>
-              <p className="mt-1.5 truncate text-xs font-semibold text-slate-100 sm:text-sm">
+              <p className="mt-1.5 truncate text-xs font-semibold text-white tracking-tight sm:text-sm">
                 {latestEvent.title}
               </p>
-              <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-slate-400 sm:text-xs">
+              <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-[#86868b]">
                 {latestEvent.detail}
               </p>
             </div>
           )}
 
-          <div className="grid gap-2.5 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,1.15fr)_minmax(240px,0.78fr)] xl:items-end xl:gap-3">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,1.15fr)_minmax(240px,0.78fr)] xl:items-end">
             <section
               aria-label="Live mission telemetry"
-              className="grid grid-cols-2 gap-2"
+              className="grid grid-cols-2 gap-2.5"
             >
               <TelemetryCard
                 icon={<BatteryCharging size={14} />}
@@ -241,7 +280,7 @@ function MissionControl({
                 icon={<Zap size={14} />}
                 label="SOLAR GENERATION"
                 value={`${formatQuantity(specifications.solarGeneration)} W`}
-                detail="Current array output"
+                detail="Solar array output"
                 accent="cyan"
               />
               <TelemetryCard
@@ -251,7 +290,7 @@ function MissionControl({
                 detail={
                   activeObservationName
                     ? `Active · ${activeObservationName}`
-                    : 'No observation active'
+                    : 'Standby load'
                 }
                 accent="blue"
               />
@@ -267,14 +306,14 @@ function MissionControl({
 
             <section
               aria-label="Mission time controls"
-              className="rounded-lg border border-cyan-100/10 bg-[#061322]/85 p-3 shadow-xl shadow-black/20 backdrop-blur-xl sm:p-4"
+              className="rounded-3xl border border-white/[0.08] apple-glass p-4 sm:p-5 shadow-2xl"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[9px] font-semibold tracking-[0.2em] text-slate-400">
-                    MISSION TIMELINE
+                  <p className="text-[10px] font-semibold tracking-[0.2em] text-[#86868b] uppercase">
+                    Mission Timeline
                   </p>
-                  <p className="mt-1 truncate text-xs font-medium text-slate-100">
+                  <p className="mt-0.5 truncate text-xs font-medium text-white tracking-tight">
                     {activeObservationName
                       ? `Acquiring · ${activeObservationName}`
                       : missionEnded
@@ -282,7 +321,7 @@ function MissionControl({
                         : 'Observation sequence standby'}
                   </p>
                 </div>
-                <span className="shrink-0 font-mono text-[10px] tabular-nums text-cyan-100">
+                <span className="shrink-0 font-mono text-[11px] tabular-nums text-white">
                   {formatQuantity(missionState.currentTimeMinute)} /{' '}
                   {formatQuantity(missionState.missionWindowDurationMinutes)} MIN
                 </span>
@@ -293,14 +332,14 @@ function MissionControl({
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(missionProgress)}
-                className="mt-3 h-1 overflow-hidden rounded-full bg-white/10"
+                className="mt-3.5 h-1.5 overflow-hidden rounded-full bg-white/[0.08]"
               >
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-400 transition-[width] duration-500"
+                  className="h-full rounded-full bg-gradient-to-r from-[#2997ff] to-[#0071e3] transition-[width] duration-500"
                   style={{ width: `${missionProgress}%` }}
                 />
               </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2.5">
                 <button
                   type="button"
                   onClick={onTogglePlayback}
@@ -308,19 +347,19 @@ function MissionControl({
                   aria-label={
                     isPlaybackRunning ? 'Pause mission playback' : 'Play mission'
                   }
-                  className={`flex min-w-[105px] items-center justify-center gap-2 rounded-md border px-3 py-2 text-[9px] font-bold tracking-[0.12em] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                  className={`apple-pill-btn flex min-w-[110px] items-center justify-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold tracking-wider uppercase transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-40 ${
                     isPlaybackRunning
-                      ? 'border-amber-200/30 bg-amber-200/10 text-amber-100'
-                      : 'border-cyan-200/25 bg-cyan-200/10 text-cyan-100 hover:bg-cyan-200/15'
+                      ? 'border border-amber-400/30 bg-amber-400/15 text-amber-200 shadow-sm'
+                      : 'bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-[0_2px_12px_rgba(0,113,227,0.35)]'
                   }`}
                 >
-                  {isPlaybackRunning ? <Pause size={13} /> : <Play size={13} />}
-                  {isPlaybackRunning ? 'PAUSE' : 'PLAY'}
+                  {isPlaybackRunning ? <Pause size={12} /> : <Play size={12} />}
+                  {isPlaybackRunning ? 'Pause' : 'Play'}
                 </button>
                 <div
                   role="group"
                   aria-label="Simulation playback speed"
-                  className="flex items-center rounded-md border border-white/10 bg-white/[0.025] p-0.5"
+                  className="flex items-center rounded-full border border-white/[0.08] bg-white/[0.04] p-1"
                 >
                   {playbackSpeeds.map((speed) => (
                     <button
@@ -330,10 +369,10 @@ function MissionControl({
                       aria-pressed={playbackSpeed === speed}
                       onClick={() => onPlaybackSpeedChange(speed)}
                       disabled={missionEnded}
-                      className={`rounded px-2 py-1.5 text-[9px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                         playbackSpeed === speed
-                          ? 'bg-cyan-200/15 text-cyan-100'
-                          : 'text-slate-500 hover:text-slate-200'
+                          ? 'bg-white/[0.15] text-white shadow-sm'
+                          : 'text-[#86868b] hover:text-white'
                       }`}
                     >
                       {speed}×
@@ -342,37 +381,37 @@ function MissionControl({
                 </div>
                 <span
                   aria-live="polite"
-                  className={`text-[8px] font-bold tracking-[0.12em] ${
-                    isPlaybackRunning ? 'text-emerald-200' : 'text-slate-500'
+                  className={`text-[9px] font-semibold tracking-[0.14em] uppercase ${
+                    isPlaybackRunning ? 'text-[#34c759]' : 'text-[#86868b]'
                   }`}
                 >
                   {isPlaybackRunning
-                    ? `RUNNING · ${playbackSpeed}×`
+                    ? `Running · ${playbackSpeed}×`
                     : missionEnded
-                      ? 'COMPLETE'
+                      ? 'Complete'
                       : playbackPauseReason
-                        ? 'PAUSED'
-                        : 'READY'}
+                        ? 'Paused'
+                        : 'Ready'}
                 </span>
               </div>
-              <label className="mt-2 flex cursor-pointer items-center justify-between gap-3 text-[9px] text-slate-400">
-                <span>Pause at events and observation changes</span>
+              <label className="mt-2.5 flex cursor-pointer items-center justify-between gap-3 text-[10px] text-[#86868b]">
+                <span>Pause at events & observation changes</span>
                 <input
                   type="checkbox"
                   checked={autoPauseOnTransitions}
                   onChange={(event) => onAutoPauseChange(event.target.checked)}
-                  className="accent-cyan-300"
+                  className="accent-[#0071e3] rounded cursor-pointer"
                 />
               </label>
               {playbackPauseReason && !isPlaybackRunning && (
                 <p
                   role="status"
-                  className="mt-2 text-[9px] leading-relaxed text-amber-100/75"
+                  className="mt-2 text-[10px] leading-relaxed text-amber-200/80"
                 >
                   {playbackPauseReason}
                 </p>
               )}
-              <div className="mt-3 grid grid-cols-3 gap-1.5">
+              <div className="mt-3.5 grid grid-cols-3 gap-2">
                 <TimeControlButton
                   label="+1 MIN"
                   onClick={() =>
@@ -407,6 +446,30 @@ function MissionControl({
                   }
                 />
               </div>
+
+              <div className="mt-3.5 pt-3 border-t border-white/[0.08] flex items-center justify-between gap-2">
+                <span className="text-[10px] font-semibold tracking-wider text-[#86868b] uppercase">Flight Actions:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={triggerAttitudeTrim}
+                    disabled={missionEnded}
+                    title="Fire attitude control RCS thrusters to optimize solar panel angle"
+                    className="apple-pill-btn flex items-center gap-1.5 rounded-full border border-amber-400/20 bg-amber-400/10 hover:bg-amber-400/20 px-3 py-1.5 text-[10px] font-medium text-amber-200 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Flame size={12} className="text-amber-400" /> RCS Sun Trim
+                  </button>
+                  <button
+                    type="button"
+                    onClick={triggerDownlinkBurst}
+                    disabled={missionEnded}
+                    title="Prioritize Deep Space Network ground station downlink"
+                    className="apple-pill-btn flex items-center gap-1.5 rounded-full border border-[#0071e3]/30 bg-[#0071e3]/10 hover:bg-[#0071e3]/20 px-3 py-1.5 text-[10px] font-medium text-[#2997ff] transition disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <RadioTower size={12} /> DSN Lock
+                  </button>
+                </div>
+              </div>
               {advancementErrors.length > 0 && (
                 <div
                   role="alert"
@@ -417,14 +480,14 @@ function MissionControl({
               )}
             </section>
 
-            <section className="rounded-lg border border-white/10 bg-[#061322]/85 p-3 shadow-xl shadow-black/20 backdrop-blur-xl sm:p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <Satellite size={13} className="text-cyan-200" />
-                <p className="text-[9px] font-semibold tracking-[0.2em] text-slate-300">
-                  SPACECRAFT SYSTEMS
+            <section className="rounded-3xl border border-white/[0.08] apple-glass p-4 sm:p-5 shadow-2xl">
+              <div className="mb-2.5 flex items-center gap-2">
+                <Satellite size={14} className="text-[#2997ff]" />
+                <p className="text-[10px] font-semibold tracking-[0.2em] text-[#86868b] uppercase">
+                  Spacecraft Systems
                 </p>
               </div>
-              <dl className="space-y-1.5">
+              <dl className="space-y-2">
                 <CompactSummary
                   label="Power"
                   value={powerSystem?.name ?? spacecraftConfiguration.powerSystemId}
@@ -441,7 +504,7 @@ function MissionControl({
                   value={storageSystem?.name ?? spacecraftConfiguration.storageSystemId}
                 />
               </dl>
-              <p className="mt-2 border-t border-white/10 pt-2 text-[9px] leading-relaxed text-slate-400">
+              <p className="mt-3 border-t border-white/[0.08] pt-2.5 text-[10px] leading-relaxed text-[#86868b]">
                 {instrumentNames.length > 0
                   ? instrumentNames.join(' · ')
                   : 'No instruments installed'}
@@ -452,36 +515,38 @@ function MissionControl({
       </section>
 
       {missionEnded && (
-        <div className="flex flex-col gap-3 rounded-xl border border-amber-200/15 bg-amber-200/[0.04] px-4 py-3 text-xs text-amber-100 sm:flex-row sm:items-center sm:justify-between">
-          <p role="status">Mission window complete. Final engine state is preserved for debrief.</p>
+        <div className="flex flex-col gap-3 rounded-2xl border border-[#0071e3]/30 bg-[#0071e3]/10 px-5 py-4 text-xs text-white sm:flex-row sm:items-center sm:justify-between apple-glass">
+          <p role="status" className="font-medium">
+            Mission window complete. Telemetry recorded and ready for final flight evaluation.
+          </p>
           <button
             type="button"
             onClick={onOpenDebrief}
-            className="rounded-lg bg-amber-300 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-amber-200"
+            className="apple-pill-btn bg-[#0071e3] hover:bg-[#0077ed] px-5 py-2 text-xs font-medium text-white shadow-[0_2px_12px_rgba(0,113,227,0.4)]"
           >
-            Open mission debrief
+            Open Mission Debrief
           </button>
         </div>
       )}
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]">
         <section
           aria-labelledby="mission-sequence-heading"
-          className="rounded-xl border border-white/10 bg-[#09111e]/90 p-4 sm:p-5"
+          className="rounded-3xl border border-white/[0.08] apple-card p-5 sm:p-6 shadow-xl"
         >
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-[9px] font-semibold tracking-[0.22em] text-cyan-200/70">
-                FLIGHT PLAN
+              <p className="text-[10px] font-semibold tracking-[0.22em] text-[#2997ff] uppercase">
+                Flight Plan
               </p>
               <h2
                 id="mission-sequence-heading"
-                className="mt-1 text-sm font-semibold tracking-wide text-white"
+                className="mt-1 text-base font-semibold tracking-tight text-white apple-headline"
               >
-                Observation sequence
+                Observation Sequence
               </h2>
             </div>
-            <p className="text-[10px] text-slate-500">
+            <p className="text-[10px] text-[#86868b] font-medium">
               {completedCount} / {scheduledObservations.length} COMPLETE
               {selectedObservationIds.length > scheduledObservations.length &&
                 ` · ${rejectedObservations.length} REJECTED`}
@@ -748,22 +813,24 @@ function TelemetryCard({
   percentage?: number
   accent: 'cyan' | 'blue'
 }) {
-  const accentColor = accent === 'cyan' ? 'text-cyan-200' : 'text-blue-200'
-  const meterColor =
-    accent === 'cyan' ? 'bg-cyan-300' : 'bg-blue-300'
+  const accentColor = accent === 'cyan' ? 'text-[#2997ff]' : 'text-[#0071e3]'
+  const meterGradient =
+    accent === 'cyan'
+      ? 'bg-gradient-to-r from-[#2997ff] to-[#0071e3]'
+      : 'bg-gradient-to-r from-[#0071e3] to-indigo-500'
 
   return (
-    <div className="min-w-0 rounded-lg border border-white/10 bg-[#061322]/85 px-2.5 py-2.5 shadow-lg shadow-black/15 backdrop-blur-xl sm:px-3 sm:py-3">
+    <div className="min-w-0 rounded-2xl border border-white/[0.08] apple-card px-3 py-3 shadow-lg backdrop-blur-2xl sm:px-3.5 sm:py-3.5">
       <div className="flex items-center gap-1.5">
         <span className={accentColor}>{icon}</span>
-        <span className="truncate text-[8px] font-semibold tracking-[0.16em] text-slate-400 sm:text-[9px]">
+        <span className="truncate text-[9px] font-semibold tracking-[0.16em] text-[#86868b] uppercase">
           {label}
         </span>
       </div>
-      <p className="mt-1.5 truncate text-sm font-semibold tabular-nums text-white sm:text-base">
+      <p className="mt-1.5 truncate text-sm font-semibold tabular-nums text-white sm:text-base tracking-tight">
         {value}
       </p>
-      <p className="mt-0.5 truncate text-[9px] text-slate-500">{detail}</p>
+      <p className="mt-0.5 truncate text-[10px] text-[#86868b]">{detail}</p>
       {percentage !== undefined && (
         <div
           role="meter"
@@ -771,10 +838,10 @@ function TelemetryCard({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(percentage)}
-          className="mt-2 h-0.5 overflow-hidden rounded-full bg-white/10"
+          className="mt-2.5 h-1 overflow-hidden rounded-full bg-white/[0.08]"
         >
           <div
-            className={`h-full rounded-full transition-[width] duration-500 ${meterColor}`}
+            className={`h-full rounded-full transition-[width] duration-500 ${meterGradient}`}
             style={{ width: `${percentage}%` }}
           />
         </div>
@@ -797,7 +864,7 @@ function TimeControlButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="min-w-0 rounded-md border border-cyan-200/15 bg-cyan-200/[0.06] px-1.5 py-2 text-[8px] font-bold tracking-[0.08em] text-cyan-100 transition-colors hover:border-cyan-200/30 hover:bg-cyan-200/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-slate-600 sm:px-2 sm:text-[9px]"
+      className="apple-pill-btn min-w-0 rounded-full border border-white/[0.1] bg-white/[0.04] px-2 py-1.5 text-[9px] font-semibold tracking-[0.08em] text-white/90 transition-all hover:bg-white/[0.1] hover:border-white/[0.2] disabled:cursor-not-allowed disabled:border-white/5 disabled:bg-white/[0.02] disabled:text-[#86868b] disabled:opacity-40"
     >
       {label}
     </button>
@@ -812,9 +879,9 @@ function CompactSummary({
   value: string
 }) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2 text-[9px]">
-      <dt className="shrink-0 text-slate-500">{label}</dt>
-      <dd className="truncate text-right font-medium text-slate-200">
+    <div className="flex min-w-0 items-center justify-between gap-2 text-[10px]">
+      <dt className="shrink-0 text-[#86868b]">{label}</dt>
+      <dd className="truncate text-right font-medium text-white tracking-tight">
         {value}
       </dd>
     </div>
